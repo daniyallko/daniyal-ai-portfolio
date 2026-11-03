@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/transcribe")({
         if (!(file instanceof Blob) || file.size === 0) return Response.json({ error: "No audio received" }, { status: 400 });
         if (file.size > MAX_BYTES) return Response.json({ error: "Recording is too long" }, { status: 413 });
         try {
-          const named = file instanceof File ? file : new File([file], "audio.webm", { type: file.type || "audio/webm" });
+          const named = file;
           const res = await transcribeAudio({ model: "openai/gpt-transcribe", file: named, language: "en" });
           const text = (res as unknown as { text?: string }).text?.trim() ?? "";
           return Response.json({ text });
