@@ -8,3 +8,9 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Portfolio + recruiter chatbot
+- `src/lib/portfolio.ts` is the single source of truth for portfolio content; the chatbot knowledge base is derived from it via `buildChunks()` — edit content there only.
+- Retrieval is hybrid (BM25 + embeddings fused with RRF) in `src/lib/retrieval.ts`; chunk embeddings are cached server-side in `kb_embeddings`, keyed by content hash, so changed content re-embeds automatically.
+- Chat threads are anonymous per browser (localStorage visitor UUID); all chat tables are RLS-locked and accessed only through server code that checks visitor_id. Why: recruiters shouldn't need accounts.
+- Chat streams NDJSON from `/api/chat` (sources → deltas → done) so citations and dev-mode debug data arrive alongside text.
