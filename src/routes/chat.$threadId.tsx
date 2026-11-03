@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2 } from "lucide-react";
+import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2, Volume2, Pause } from "lucide-react";
+import { useSpeech } from "@/hooks/use-speech";
 import { useLiveVoice, type LiveEvent } from "@/hooks/use-live-voice";
 import { getThread } from "@/lib/chat.functions";
 import { getVisitorId } from "@/lib/visitor";
@@ -266,8 +267,16 @@ function ThreadView({ threadId }: { threadId: string }) {
   );
 }
 
-function AssistantMessage({ m, onCite, onDev }: { m: Msg; onCite: (n: number) => void; onDev: () => void }) {
+function AssistantMessage({ m, onCite, onDev, onSpeak, speakState, speakDisabled }: {
+  m: Msg;
+  onCite: (n: number) => void;
+  onDev: () => void;
+  onSpeak: () => void;
+  speakState: "idle" | "loading" | "playing";
+  speakDisabled: boolean;
+}) {
   const md = m.content.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)");
+  const canSpeak = m.content.trim().length > 0;
   return (
     <div className="space-y-2">
       <div className="prose-chat text-[15px] leading-relaxed">
@@ -289,8 +298,21 @@ function AssistantMessage({ m, onCite, onDev }: { m: Msg; onCite: (n: number) =>
         </ReactMarkdown>
       </div>
       {m.error && <p className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">{m.error}</p>}
-      {(m.sources?.length || m.debug) && (
+      {(canSpeak || m.sources?.length || m.debug) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
+          {canSpeak && (
+            <button
+              type="button"
+              onClick={onSpeak}
+              disabled={speakDisabled && speakState === "idle"}
+              aria-label={speakState === "playing" ? "Stop playing this answer" : "Listen to this answer"}
+              title={speakState === "playing" ? "Stop" : "Listen to this answer"}
+              className={`flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs transition-colors disabled:opacity-40 ${speakState === "playing" ? "border-primary bg-accent text-accent-foreground" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}
+            >
+              {speakState === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : speakState === "playing" ? <Pause className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+              {speakState === "loading" ? "readying…" : speakState === "playing" ? "stop" : "listen"}
+            </button>
+          )}
           {m.sources?.map((s) => (
             <button key={s.n} onClick={() => onCite(s.n)} className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 font-mono text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground">
               <span className="text-primary">[{s.n}]</span> <span className="max-w-[180px] truncate">{s.title}</span>
