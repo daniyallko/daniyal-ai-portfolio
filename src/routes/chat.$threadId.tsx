@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2 } from "lucide-react";
+import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2, Volume2, Pause } from "lucide-react";
+import { useSpeech } from "@/hooks/use-speech";
 import { useLiveVoice, type LiveEvent } from "@/hooks/use-live-voice";
 import { getThread } from "@/lib/chat.functions";
 import { getVisitorId } from "@/lib/visitor";
@@ -48,6 +49,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
   const [recError, setRecError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const speech = useSpeech();
   const [captions, setCaptions] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
   const voice = useLiveVoice({
     onEvent: (ev: LiveEvent) => {
@@ -80,6 +82,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || status !== "idle") return;
+    speech.stop();
     setInput("");
     const aid = crypto.randomUUID();
     setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", content: message }]);
@@ -127,6 +130,7 @@ function ThreadView({ threadId }: { threadId: string }) {
     setRecError(null);
     if (rec === "recording") { recorderRef.current?.stop(); return; }
     if (rec !== "idle" || status !== "idle") return;
+    speech.stop();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
@@ -200,7 +204,15 @@ function ThreadView({ threadId }: { threadId: string }) {
                   <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-primary-foreground">{m.content}</div>
                 </div>
               ) : (
-                <AssistantMessage key={m.id} m={m} onCite={(n) => setPanel({ msgId: m.id, tab: "sources", focus: n })} onDev={() => setPanel({ msgId: m.id, tab: "dev" })} />
+                <AssistantMessage
+                  key={m.id}
+                  m={m}
+                  onCite={(n) => setPanel({ msgId: m.id, tab: "sources", focus: n })}
+                  onDev={() => setPanel({ msgId: m.id, tab: "dev" })}
+                  onSpeak={() => speech.speak(m.id, m.content)}
+                  speakState={speech.id === m.id ? speech.state : "idle"}
+                  speakDisabled={inCall || (status !== "idle" && m.id === messages[messages.length - 1]?.id)}
+                />
               ),
             )}
             {status === "submitted" && (
@@ -236,6 +248,7 @@ function ThreadView({ threadId }: { threadId: string }) {
             </div>
           )}
           {recError && <p role="alert" className="mb-2 text-xs text-destructive">{recError}</p>}
+          {speech.error && <p role="alert" className="mb-2 text-xs text-destructive">{speech.error}</p>}
           <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-primary/60">
             <textarea
               ref={taRef}
@@ -249,7 +262,7 @@ function ThreadView({ threadId }: { threadId: string }) {
             <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               {rec === "transcribing" ? <Loader2 className="h-4 w-4 animate-spin" /> : rec === "recording" ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-4 w-4" />}
             </button>
-            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={() => { setCaptions([]); voice.start(); }} disabled={inCall || rec !== "idle"} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={() => { speech.stop(); setCaptions([]); voice.start(); }} disabled={inCall || rec !== "idle"} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               <AudioLines className="h-4 w-4" />
             </button>
             {status === "idle" ? (
@@ -266,8 +279,16 @@ function ThreadView({ threadId }: { threadId: string }) {
   );
 }
 
-function AssistantMessage({ m, onCite, onDev }: { m: Msg; onCite: (n: number) => void; onDev: () => void }) {
+function AssistantMessage({ m, onCite, onDev, onSpeak, speakState, speakDisabled }: {
+  m: Msg;
+  onCite: (n: number) => void;
+  onDev: () => void;
+  onSpeak: () => void;
+  speakState: "idle" | "loading" | "playing";
+  speakDisabled: boolean;
+}) {
   const md = m.content.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)");
+  const canSpeak = m.content.trim().length > 0;
   return (
     <div className="space-y-2">
       <div className="prose-chat text-[15px] leading-relaxed">
@@ -289,8 +310,21 @@ function AssistantMessage({ m, onCite, onDev }: { m: Msg; onCite: (n: number) =>
         </ReactMarkdown>
       </div>
       {m.error && <p className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">{m.error}</p>}
-      {(m.sources?.length || m.debug) && (
+      {(canSpeak || m.sources?.length || m.debug) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
+          {canSpeak && (
+            <button
+              type="button"
+              onClick={onSpeak}
+              disabled={speakDisabled && speakState === "idle"}
+              aria-label={speakState === "playing" ? "Stop playing this answer" : "Listen to this answer"}
+              title={speakState === "playing" ? "Stop" : "Listen to this answer"}
+              className={`flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs transition-colors disabled:opacity-40 ${speakState === "playing" ? "border-primary bg-accent text-accent-foreground" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}
+            >
+              {speakState === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : speakState === "playing" ? <Pause className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+              {speakState === "loading" ? "readying…" : speakState === "playing" ? "stop" : "listen"}
+            </button>
+          )}
           {m.sources?.map((s) => (
             <button key={s.n} onClick={() => onCite(s.n)} className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 font-mono text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground">
               <span className="text-primary">[{s.n}]</span> <span className="max-w-[180px] truncate">{s.title}</span>
