@@ -30,7 +30,7 @@ export const getThread = createServerFn({ method: "POST" })
     if (!t) return null;
     const { data: msgs, error } = await supabaseAdmin.from("chat_messages").select("id, role, content, sources, debug").eq("thread_id", t.id).order("created_at");
     if (error) throw new Error(error.message);
-    return { ...t, messages: (msgs ?? []) as { id: string; role: string; content: string; sources: unknown; debug: unknown }[] };
+    return { ...t, messages: (msgs ?? []).map((m) => ({ id: m.id, role: m.role, content: m.content, sources: m.sources ? JSON.stringify(m.sources) : null, debug: m.debug ? JSON.stringify(m.debug) : null })) };
   });
 
 export const deleteThread = createServerFn({ method: "POST" })

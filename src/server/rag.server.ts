@@ -29,10 +29,10 @@ async function chunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> 
   }
   if (missing.length) {
     const vecs = await embed(missing.map((c) => `${c.title}\n${c.text}`));
-    const rows = missing.map((c, i) => ({ chunk_id: c.id, content_hash: hash(c.title + c.text), embedding: vecs[i], updated_at: new Date().toISOString() }));
+    const rows = missing.map((c, i) => ({ chunk_id: c.id, content_hash: hash(c.title + c.text), embedding: vecs[i]!, updated_at: new Date().toISOString() }));
     const { error: upErr } = await supabaseAdmin.from("kb_embeddings").upsert(rows);
     if (upErr) console.error("kb_embeddings upsert failed", upErr.message);
-    missing.forEach((c, i) => map.set(c.id, vecs[i]));
+    missing.forEach((c, i) => map.set(c.id, vecs[i]!));
   }
   return map;
 }
@@ -48,8 +48,9 @@ export async function retrieve(query: string, topK = 5): Promise<{ sources: Sour
   const chunks = buildChunks();
   const t0 = Date.now();
   const [vecMap, [qv]] = await Promise.all([chunkEmbeddings(chunks), embed([query])]);
+  const qvec = qv!;
   const t1 = Date.now();
-  const dense = chunks.map((c) => cosine(qv, vecMap.get(c.id) ?? []));
+  const dense = chunks.map((c) => cosine(qvec, vecMap.get(c.id) ?? []));
   const sparse = bm25Scores(query, chunks);
   const ranked = hybridRank(chunks, sparse, dense);
   // Relevance gate: keep top-K with some lexical or semantic signal.

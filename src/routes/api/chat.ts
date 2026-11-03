@@ -62,7 +62,7 @@ export const Route = createFileRoute("/api/chat")({
               ];
               const tLlm = Date.now();
               let firstToken: number | null = null;
-              const s = await streamResponse({ model: MODEL, instructions: SYSTEM, input, reasoning: { effort: "low" }, store: false }, { signal: request.signal });
+              const s = await streamResponse({ model: MODEL, instructions: SYSTEM, input, reasoning: { effort: "low" } }, { signal: request.signal });
               let usage: unknown = null;
               for await (const ev of s as AsyncIterable<{ type: string; delta?: string; response?: { usage?: unknown } }>) {
                 if (ev.type === "response.output_text.delta" && ev.delta) {
@@ -71,7 +71,7 @@ export const Route = createFileRoute("/api/chat")({
                   send({ type: "delta", text: ev.delta });
                 } else if (ev.type === "response.completed") usage = ev.response?.usage ?? null;
               }
-              debug = { ...debug, timingsMs: { ...(debug.timingsMs as object), firstToken, total: Date.now() - t0 }, usage };
+              debug = { ...debug, timingsMs: { ...(debug["timingsMs"] as object), firstToken, total: Date.now() - t0 }, usage };
               send({ type: "done", debug });
             } catch (e) {
               const msg = e instanceof GatewayError ? e.message : "Something went wrong generating the answer.";

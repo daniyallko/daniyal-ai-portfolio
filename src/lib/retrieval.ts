@@ -34,7 +34,7 @@ export function bm25Scores(query: string, chunks: Chunk[], k1 = 1.4, b = 0.75): 
 
 export function cosine(a: number[], b: number[]): number {
   let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  for (let i = 0; i < a.length; i++) { const x = a[i]!, y = b[i] ?? 0; dot += x * y; na += x * x; nb += y * y; }
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
 }
 
@@ -51,8 +51,8 @@ export function hybridRank(chunks: Chunk[], bm25: number[], dense: number[], k =
   const br = ranks(bm25), dr = ranks(dense);
   return chunks
     .map((chunk, i) => ({
-      chunk, bm25: bm25[i], dense: dense[i], bm25Rank: br[i], denseRank: dr[i],
-      rrf: (isFinite(br[i]) ? 1 / (k + br[i]) : 0) + (isFinite(dr[i]) ? 1 / (k + dr[i]) : 0),
+      chunk, bm25: bm25[i]!, dense: dense[i]!, bm25Rank: br[i]!, denseRank: dr[i]!,
+      rrf: (isFinite(br[i]!) ? 1 / (k + br[i]!) : 0) + (isFinite(dr[i]!) ? 1 / (k + dr[i]!) : 0),
     }))
     .sort((a, b) => b.rrf - a.rrf);
 }

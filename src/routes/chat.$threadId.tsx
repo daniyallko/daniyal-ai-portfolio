@@ -48,7 +48,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   useEffect(() => {
     getThread({ data: { visitorId, threadId } }).then((t) => {
       if (!t) return setLoaded("missing");
-      setMessages(t.messages.map((m) => ({ id: m.id, role: m.role as Msg["role"], content: m.content, sources: (m.sources as Source[]) ?? undefined, debug: (m.debug as Debug) ?? undefined })));
+      setMessages(t.messages.map((m) => ({ id: m.id, role: m.role as Msg["role"], content: m.content, sources: m.sources ? (JSON.parse(m.sources) as Source[]) : undefined, debug: m.debug ? (JSON.parse(m.debug) as Debug) : undefined })));
       setLoaded("ok");
     });
   }, [threadId, visitorId]);
@@ -217,7 +217,7 @@ function AssistantMessage({ m, onCite, onDev }: { m: Msg; onCite: (n: number) =>
   );
 }
 
-function InspectPanel({ m, tab, focus, setTab, onClose }: { m: Msg; tab: "sources" | "dev"; focus?: number; setTab: (t: "sources" | "dev") => void; onClose: () => void }) {
+function InspectPanel({ m, tab, focus, setTab, onClose }: { m: Msg; tab: "sources" | "dev"; focus?: number | undefined; setTab: (t: "sources" | "dev") => void; onClose: () => void }) {
   const focusRef = useRef<HTMLDivElement>(null);
   useEffect(() => { focusRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [focus, tab]);
   const d = m.debug;
