@@ -63,12 +63,14 @@ function Index() {
           <span className="mt-4 flex items-center gap-1 font-mono text-sm text-primary">start chat <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></span>
         </Link>
 
-        {stats.map((s) => (
-          <div key={s.label} className={`${card} md:col-span-3 lg:col-span-3 xl:col-span-3`} style={{ gridColumn: undefined }}>
-            <p className="font-mono text-4xl font-bold text-primary">{s.value}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{s.label}</p>
-          </div>
-        )).reduce<React.ReactNode[]>((acc, el, i) => (acc.push(<div key={i} className="contents md:[&>*]:col-span-3 lg:[&>*]:col-span-3">{el}</div>), acc), [])}
+        <section className="grid grid-cols-2 gap-4 md:col-span-6 md:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className={card}>
+              <p className="font-mono text-4xl font-bold text-primary">{s.value}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{s.label}</p>
+            </div>
+          ))}
+        </section>
 
         <section className={`${card} md:col-span-4`}>
           <p className={label}>featured project</p>
