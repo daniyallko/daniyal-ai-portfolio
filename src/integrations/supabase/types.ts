@@ -14,7 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          debug: Json | null
+          id: string
+          role: string
+          sources: Json | null
+          thread_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          debug?: Json | null
+          id?: string
+          role: string
+          sources?: Json | null
+          thread_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          debug?: Json | null
+          id?: string
+          role?: string
+          sources?: Json | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_threads: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          visitor_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          visitor_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          visitor_id?: string
+        }
+        Relationships: []
+      }
+      kb_embeddings: {
+        Row: {
+          chunk_id: string
+          content_hash: string
+          embedding: Json
+          updated_at: string
+        }
+        Insert: {
+          chunk_id: string
+          content_hash: string
+          embedding: Json
+          updated_at?: string
+        }
+        Update: {
+          chunk_id?: string
+          content_hash?: string
+          embedding?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
