@@ -56,7 +56,7 @@ function ThreadView({ threadId }: { threadId: string }) {
       if (!isIn && !isOut) return;
       const delta = typeof ev["delta"] === "string" ? (ev["delta"] as string) : "";
       if (!delta) return;
-      const role = isIn ? "user" : "assistant";
+      const role: "user" | "assistant" = isIn ? "user" : "assistant";
       setCaptions((c) => {
         const last = c[c.length - 1];
         if (last && last.role === role) return [...c.slice(0, -1), { role, text: last.text + delta }];
