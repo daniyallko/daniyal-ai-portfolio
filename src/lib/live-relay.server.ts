@@ -52,6 +52,8 @@ export function getLiveConfig(): LiveConfig {
   const config: LiveConfig = {
     ...liveSettings,
     key: process.env["LOVABLE_API_KEY"] ?? "",
+    openingInstructions:
+      "In English, greet the caller in one short sentence as Daniyal's portfolio voice assistant, then ask what they'd like to know about his experience or projects. Then listen.",
   };
   if ([config.key, config.liveModel, config.backendModel].some((value) => !value)) {
     throw new Error("Missing Live relay configuration");
@@ -142,6 +144,11 @@ async function answerQuestion(
   if (!answer.trim()) throw new Error("The backend response had no answer");
   messages.push({ role: "assistant", content: answer });
   return answer;
+}
+
+function isListeningSound(text: string) {
+  const normalized = text.toLowerCase().replace(/[\s\p{Pd}]/gu, "");
+  return /^(?:m+hm+|uhhuh)[.,!]*$/.test(normalized);
 }
 
 function* commentaryChunks(content: string) {
