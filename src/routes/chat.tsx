@@ -44,6 +44,7 @@ function ChatLayout() {
       <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
         <div className="flex items-center justify-between p-4">
           <Link to="/" className="flex items-center gap-1.5 font-mono text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />portfolio</Link>
+          <Link to="/eval" className="font-mono text-xs text-muted-foreground hover:text-primary">eval</Link>
         </div>
         <button onClick={onNew} className="mx-3 flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4" /> New chat
