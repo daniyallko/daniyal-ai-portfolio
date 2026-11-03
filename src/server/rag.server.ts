@@ -1,0 +1,70 @@
+import { generateEmbeddings } from "@lovable.dev/ai-gateway";
+import { buildChunks, type Chunk } from "@/lib/portfolio";
+import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
+
+const EMBED_MODEL = "google/gemini-embedding-2";
+
+function hash(s: string) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+async function embed(texts: string[]): Promise<number[][]> {
+  const res = await generateEmbeddings({ model: EMBED_MODEL, input: texts });
+  return (res as unknown as { data: { embedding: number[] }[] }).data.map((d) => d.embedding);
+}
+
+async function chunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.from("kb_embeddings").select("chunk_id, content_hash, embedding");
+  if (error) throw new Error(error.message);
+  const map = new Map<string, number[]>();
+  const have = new Map((data ?? []).map((r) => [r.chunk_id, r]));
+  const missing: Chunk[] = [];
+  for (const c of chunks) {
+    const row = have.get(c.id);
+    if (row && row.content_hash === hash(c.title + c.text)) map.set(c.id, row.embedding as number[]);
+    else missing.push(c);
+  }
+  if (missing.length) {
+    const vecs = await embed(missing.map((c) => `${c.title}\n${c.text}`));
+    const rows = missing.map((c, i) => ({ chunk_id: c.id, content_hash: hash(c.title + c.text), embedding: vecs[i], updated_at: new Date().toISOString() }));
+    const { error: upErr } = await supabaseAdmin.from("kb_embeddings").upsert(rows);
+    if (upErr) console.error("kb_embeddings upsert failed", upErr.message);
+    missing.forEach((c, i) => map.set(c.id, vecs[i]));
+  }
+  return map;
+}
+
+export type Source = { n: number; id: string; section: string; title: string; text: string };
+export type RetrievalDebug = {
+  query: string;
+  timingsMs: { embed: number; retrieve: number };
+  candidates: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
+};
+
+export async function retrieve(query: string, topK = 5): Promise<{ sources: Source[]; debug: RetrievalDebug }> {
+  const chunks = buildChunks();
+  const t0 = Date.now();
+  const [vecMap, [qv]] = await Promise.all([chunkEmbeddings(chunks), embed([query])]);
+  const t1 = Date.now();
+  const dense = chunks.map((c) => cosine(qv, vecMap.get(c.id) ?? []));
+  const sparse = bm25Scores(query, chunks);
+  const ranked = hybridRank(chunks, sparse, dense);
+  // Relevance gate: keep top-K with some lexical or semantic signal.
+  const kept = new Set(ranked.filter((r) => r.bm25 > 0 || r.dense > 0.35).slice(0, topK).map((r) => r.chunk.id));
+  const sources = ranked.filter((r) => kept.has(r.chunk.id)).map((r, i) => ({ n: i + 1, id: r.chunk.id, section: r.chunk.section, title: r.chunk.title, text: r.chunk.text }));
+  return {
+    sources,
+    debug: {
+      query,
+      timingsMs: { embed: t1 - t0, retrieve: Date.now() - t1 },
+      candidates: ranked.slice(0, 10).map((r) => ({
+        id: r.chunk.id, title: r.chunk.title, bm25: +r.bm25.toFixed(3), dense: +r.dense.toFixed(3),
+        bm25Rank: isFinite(r.bm25Rank) ? r.bm25Rank : null, denseRank: isFinite(r.denseRank) ? r.denseRank : null,
+        rrf: +r.rrf.toFixed(5), kept: kept.has(r.chunk.id),
+      })),
+    },
+  };
+}
