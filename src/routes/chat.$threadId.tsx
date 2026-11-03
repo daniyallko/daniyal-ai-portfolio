@@ -49,6 +49,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
   const [recError, setRecError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const speech = useSpeech();
   const [captions, setCaptions] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
   const voice = useLiveVoice({
     onEvent: (ev: LiveEvent) => {
@@ -81,6 +82,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || status !== "idle") return;
+    speech.stop();
     setInput("");
     const aid = crypto.randomUUID();
     setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", content: message }]);
@@ -128,6 +130,7 @@ function ThreadView({ threadId }: { threadId: string }) {
     setRecError(null);
     if (rec === "recording") { recorderRef.current?.stop(); return; }
     if (rec !== "idle" || status !== "idle") return;
+    speech.stop();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
@@ -201,7 +204,15 @@ function ThreadView({ threadId }: { threadId: string }) {
                   <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-primary-foreground">{m.content}</div>
                 </div>
               ) : (
-                <AssistantMessage key={m.id} m={m} onCite={(n) => setPanel({ msgId: m.id, tab: "sources", focus: n })} onDev={() => setPanel({ msgId: m.id, tab: "dev" })} />
+                <AssistantMessage
+                  key={m.id}
+                  m={m}
+                  onCite={(n) => setPanel({ msgId: m.id, tab: "sources", focus: n })}
+                  onDev={() => setPanel({ msgId: m.id, tab: "dev" })}
+                  onSpeak={() => speech.speak(m.id, m.content)}
+                  speakState={speech.id === m.id ? speech.state : "idle"}
+                  speakDisabled={inCall || (status !== "idle" && m.id === messages[messages.length - 1]?.id)}
+                />
               ),
             )}
             {status === "submitted" && (
@@ -237,6 +248,7 @@ function ThreadView({ threadId }: { threadId: string }) {
             </div>
           )}
           {recError && <p role="alert" className="mb-2 text-xs text-destructive">{recError}</p>}
+          {speech.error && <p role="alert" className="mb-2 text-xs text-destructive">{speech.error}</p>}
           <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-primary/60">
             <textarea
               ref={taRef}
