@@ -76,6 +76,30 @@ export type Database = {
         }
         Relationships: []
       }
+      eval_runs: {
+        Row: {
+          created_at: string
+          id: string
+          model: string
+          results: Json
+          summary: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model: string
+          results: Json
+          summary: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string
+          results?: Json
+          summary?: Json
+        }
+        Relationships: []
+      }
       kb_embeddings: {
         Row: {
           chunk_id: string
