@@ -19,7 +19,7 @@ type Debug = {
   usage?: unknown;
   candidates?: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
 };
-type Msg = { id: string; role: "user" | "assistant"; content: string; sources?: Source[]; debug?: Debug; error?: string };
+type Msg = { id: string; role: "user" | "assistant"; content: string; sources?: Source[] | undefined; debug?: Debug | undefined; error?: string | undefined };
 
 const SUGGESTIONS = [
   "What RAG systems has Daniyal built in production?",
