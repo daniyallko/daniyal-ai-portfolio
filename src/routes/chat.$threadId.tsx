@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft } from "lucide-react";
+import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2 } from "lucide-react";
+import { useLiveVoice, type LiveEvent } from "@/hooks/use-live-voice";
 import { getThread } from "@/lib/chat.functions";
 import { getVisitorId } from "@/lib/visitor";
 
@@ -44,6 +45,26 @@ function ThreadView({ threadId }: { threadId: string }) {
   const abortRef = useRef<AbortController | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
+  const [recError, setRecError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const [captions, setCaptions] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
+  const voice = useLiveVoice({
+    onEvent: (ev: LiveEvent) => {
+      const isIn = ev.type === "session.input_transcript.delta";
+      const isOut = ev.type === "session.output_transcript.delta";
+      if (!isIn && !isOut) return;
+      const delta = typeof ev["delta"] === "string" ? (ev["delta"] as string) : "";
+      if (!delta) return;
+      const role: "user" | "assistant" = isIn ? "user" : "assistant";
+      setCaptions((c) => {
+        const last = c[c.length - 1];
+        if (last && last.role === role) return [...c.slice(0, -1), { role, text: last.text + delta }];
+        return [...c, { role, text: delta }].slice(-6);
+      });
+    },
+  });
+  const inCall = voice.status === "connecting" || voice.status === "connected" || voice.status === "stopping";
 
   useEffect(() => {
     getThread({ data: { visitorId, threadId } }).then((t) => {
@@ -102,6 +123,42 @@ function ThreadView({ threadId }: { threadId: string }) {
     }
   };
 
+  const toggleRecord = async () => {
+    setRecError(null);
+    if (rec === "recording") { recorderRef.current?.stop(); return; }
+    if (rec !== "idle" || status !== "idle") return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const parts: Blob[] = [];
+      mr.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        recorderRef.current = null;
+        const type = mr.mimeType || "audio/webm";
+        const blob = new Blob(parts, { type });
+        if (blob.size < 1000) { setRec("idle"); setRecError("That recording was too short."); return; }
+        setRec("transcribing");
+        try {
+          const fd = new FormData();
+          fd.append("file", new File([blob], type.includes("mp4") ? "question.mp4" : "question.webm", { type }));
+          const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+          const j = (await res.json()) as { text?: string; error?: string };
+          if (!res.ok) throw new Error(j.error ?? "Transcription failed");
+          if (!j.text) throw new Error("I couldn't hear a question. Try again.");
+          setRec("idle");
+          void send(j.text);
+        } catch (e) { setRec("idle"); setRecError((e as Error).message); }
+      };
+      recorderRef.current = mr;
+      mr.start();
+      setRec("recording");
+    } catch { setRecError("Microphone access was blocked."); }
+  };
+
+  useEffect(() => () => { const mr = recorderRef.current; if (mr && mr.state !== "inactive") { mr.onstop = null; mr.stop(); mr.stream.getTracks().forEach((t) => t.stop()); } }, []);
+
   if (loaded === "missing")
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -156,6 +213,29 @@ function ThreadView({ threadId }: { threadId: string }) {
         </div>
 
         <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mx-auto w-full max-w-3xl px-6 pb-6">
+          <audio ref={voice.audioRef} className="hidden" />
+          {(inCall || voice.error) && (
+            <div className="mb-2 rounded-xl border border-primary/40 bg-card p-3">
+              <div className="flex items-center gap-2 font-mono text-xs">
+                <span className={`inline-block h-2 w-2 rounded-full ${voice.status === "connected" ? "animate-pulse bg-primary" : "bg-muted-foreground"}`} />
+                <span className="text-muted-foreground">{voice.status === "connected" ? (voice.muted ? "voice call · muted" : "voice call · listening — just talk, interrupt anytime") : voice.status === "connecting" ? "connecting voice…" : voice.status === "stopping" ? "ending call…" : "voice call ended"}</span>
+                {voice.status === "connected" && (
+                  <button type="button" onClick={() => voice.setMuted(!voice.muted)} className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:text-foreground">{voice.muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}{voice.muted ? "unmute" : "mute"}</button>
+                )}
+                {inCall && (
+                  <button type="button" onClick={voice.stop} disabled={voice.status === "stopping"} className={`${voice.status === "connected" ? "" : "ml-auto "}flex items-center gap-1 rounded-md bg-destructive px-2 py-1 text-destructive-foreground disabled:opacity-50`}><PhoneOff className="h-3.5 w-3.5" />end</button>
+                )}
+              </div>
+              {voice.playbackBlocked && <button type="button" onClick={voice.resumePlayback} className="mt-2 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">Tap to hear the assistant</button>}
+              {voice.error && <p role="alert" className="mt-2 text-xs text-destructive">{voice.error}</p>}
+              {captions.length > 0 && (
+                <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-sm">
+                  {captions.map((c, i) => <p key={i} className={c.role === "user" ? "text-muted-foreground" : "text-foreground"}><span className="font-mono text-xs text-primary">{c.role === "user" ? "you › " : "ai › "}</span>{c.text}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+          {recError && <p role="alert" className="mb-2 text-xs text-destructive">{recError}</p>}
           <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-primary/60">
             <textarea
               ref={taRef}
@@ -163,9 +243,15 @@ function ThreadView({ threadId }: { threadId: string }) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
               rows={1}
-              placeholder="Ask about experience, projects, stack…"
+              placeholder={rec === "recording" ? "Recording… tap the mic to finish" : rec === "transcribing" ? "Transcribing…" : "Ask about experience, projects, stack…"}
               className="max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground"
             />
+            <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+              {rec === "transcribing" ? <Loader2 className="h-4 w-4 animate-spin" /> : rec === "recording" ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-4 w-4" />}
+            </button>
+            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={() => { setCaptions([]); voice.start(); }} disabled={inCall || rec !== "idle"} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+              <AudioLines className="h-4 w-4" />
+            </button>
             {status === "idle" ? (
               <button type="submit" aria-label="Send" disabled={!input.trim()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
             ) : (

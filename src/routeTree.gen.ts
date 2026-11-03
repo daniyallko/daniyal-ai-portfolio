@@ -14,6 +14,7 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as EvalRouteImport } from './routes/eval'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiEvalRouteImport } from './routes/api/eval'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as ChatThreadIdRouteImport } from './routes/chat.$threadId'
 
@@ -42,6 +43,11 @@ const ApiEvalRoute = ApiEvalRouteImport.update({
   path: '/api/eval',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/eval': typeof EvalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/chat/': typeof ChatIndexRoute
 }
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/eval': typeof EvalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/chat': typeof ChatIndexRoute
 }
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/eval': typeof EvalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/chat/': typeof ChatIndexRoute
 }
@@ -88,10 +97,18 @@ export interface FileRouteTypes {
     | '/eval'
     | '/api/chat'
     | '/api/eval'
+    | '/api/transcribe'
     | '/chat/$threadId'
     | '/chat/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/eval' | '/api/chat' | '/api/eval' | '/chat/$threadId' | '/chat'
+  to:
+    | '/'
+    | '/eval'
+    | '/api/chat'
+    | '/api/eval'
+    | '/api/transcribe'
+    | '/chat/$threadId'
+    | '/chat'
   id:
     | '__root__'
     | '/'
@@ -99,6 +116,7 @@ export interface FileRouteTypes {
     | '/eval'
     | '/api/chat'
     | '/api/eval'
+    | '/api/transcribe'
     | '/chat/$threadId'
     | '/chat/'
   fileRoutesById: FileRoutesById
@@ -109,6 +127,7 @@ export interface RootRouteChildren {
   EvalRoute: typeof EvalRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiEvalRoute: typeof ApiEvalRoute
+  ApiTranscribeRoute: typeof ApiTranscribeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -148,6 +167,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEvalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chat/': {
       id: '/chat/'
       path: '/'
@@ -183,6 +209,7 @@ const rootRouteChildren: RootRouteChildren = {
   EvalRoute: EvalRoute,
   ApiChatRoute: ApiChatRoute,
   ApiEvalRoute: ApiEvalRoute,
+  ApiTranscribeRoute: ApiTranscribeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
