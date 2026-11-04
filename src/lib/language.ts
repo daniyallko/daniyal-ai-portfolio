@@ -99,7 +99,7 @@ const isCJK = (s: string) => /[\u3040-\u30FF\u4E00-\u9FFF]/.test(s);
  */
 export function polyglotFirstClause(text: string, min = 5, max = 8): { first: string; rest: string; delimiter: string | null } {
   const s = text.trim();
-  if (isCJK(s) && !/\s/.test(s.slice(0, 30))) {
+  if (isCJK(s) && count(s, /[\u3040-\u30FF\u4E00-\u9FFF]/g) / Math.max(1, count(s, /\S/g)) > 0.3) {
     const chars = [...s];
     if (chars.length <= 28) return { first: s, rest: "", delimiter: null };
     for (let i = 7; i < Math.min(40, chars.length); i++) {
