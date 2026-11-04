@@ -89,7 +89,8 @@ export function liveVoiceDev(): Plugin {
                 },
               });
             });
-          } catch {
+          } catch (error) {
+            console.error("live voice upgrade failed", error);
             rejectUpgrade(socket, 503);
           } finally {
             clearTimeout(timer);
