@@ -50,23 +50,108 @@ function ThreadView({ threadId }: { threadId: string }) {
   const [recError, setRecError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const speech = useSpeech();
-  const [captions, setCaptions] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
+  type Caption = { role: "user" | "assistant"; text: string; turn: number; interrupted?: boolean };
+  const [captions, setCaptions] = useState<Caption[]>([]);
+  const turnsRef = useRef<Caption[]>([]); // full call transcript, persisted on hang-up
+  const turnRef = useRef(0);
+  const dropAssistantRef = useRef(false);
+  const capStartPlayedRef = useRef(0);
+  const prefetchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastPrefetchKey = useRef("");
+  const retrievingRef = useRef(false);
+  const [prefetchLog, setPrefetchLog] = useState<PrefetchLog[]>([]);
+  const [dispatches, setDispatches] = useState<Dispatch[]>([]);
+  const [endpointMs, setEndpointMs] = useState(700);
+  const dispatch = (text: string, source: Dispatch["source"]) => {
+    const acts = detectActions(text);
+    if (acts.length) setDispatches((d) => [...d, ...acts.map((action) => ({ at: Date.now(), source, action, href: actionHref(action) }))].slice(-8));
+  };
+  const updateCaptions = (fn: (c: Caption[]) => Caption[]) => {
+    turnsRef.current = fn(turnsRef.current);
+    setCaptions(turnsRef.current.slice(-6));
+  };
+  const prefetch = (text: string) => {
+    clearTimeout(prefetchTimer.current);
+    setEndpointMs(endpointSilenceMs(text));
+    if (text.trim().split(/\s+/).length <= 4) return;
+    prefetchTimer.current = setTimeout(async () => {
+      const key = normalizeQueryKey(text);
+      if (!key || key === lastPrefetchKey.current) return;
+      lastPrefetchKey.current = key;
+      retrievingRef.current = true;
+      try {
+        const r = await fetch("/api/prefetch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: text }) });
+        const j = (await r.json()) as { cache?: string; ms?: number };
+        if (r.ok) setPrefetchLog((l) => [...l, { query: text, cache: j.cache ?? "miss", ms: j.ms ?? 0 }].slice(-20));
+      } catch { /* speculative only */ } finally { retrievingRef.current = false; }
+    }, 250);
+  };
   const voice = useLiveVoice({
     onEvent: (ev: LiveEvent) => {
+      if (ev.type === "app.barge_in") {
+        // Drop zombie tokens of the interrupted turn and keep only what was actually heard.
+        dropAssistantRef.current = true;
+        const played = Number(ev["playedMs"] ?? 0) - capStartPlayedRef.current;
+        updateCaptions((c) => {
+          const last = c[c.length - 1];
+          if (!last || last.role !== "assistant") return c;
+          return [...c.slice(0, -1), { ...last, text: truncateToPlayed(last.text, played), interrupted: true }];
+        });
+        setTimeout(() => {
+          const last = turnsRef.current[turnsRef.current.length - 1];
+          if (last?.role !== "user") dropAssistantRef.current = false; // false alarm
+        }, 1200);
+        return;
+      }
       const isIn = ev.type === "session.input_transcript.delta";
       const isOut = ev.type === "session.output_transcript.delta";
       if (!isIn && !isOut) return;
       const delta = typeof ev["delta"] === "string" ? (ev["delta"] as string) : "";
       if (!delta) return;
-      const role: "user" | "assistant" = isIn ? "user" : "assistant";
-      setCaptions((c) => {
-        const last = c[c.length - 1];
-        if (last && last.role === role) return [...c.slice(0, -1), { role, text: last.text + delta }];
-        return [...c, { role, text: delta }].slice(-6);
+      if (isIn) {
+        dropAssistantRef.current = false;
+        const last = turnsRef.current[turnsRef.current.length - 1];
+        if (!last || last.role !== "user") turnRef.current += 1;
+        const turn = turnRef.current;
+        updateCaptions((c) => {
+          const l = c[c.length - 1];
+          if (l && l.role === "user") return [...c.slice(0, -1), { ...l, text: l.text + delta }];
+          return [...c, { role: "user", text: delta, turn }];
+        });
+        prefetch(turnsRef.current[turnsRef.current.length - 1]!.text);
+        return;
+      }
+      if (dropAssistantRef.current) return;
+      const last = turnsRef.current[turnsRef.current.length - 1];
+      if (!last || last.role !== "assistant") {
+        capStartPlayedRef.current = voice.telemetry.current.playedMs;
+        if (last?.role === "user") dispatch(last.text, "voice"); // sync tool dispatch with audio onset
+      }
+      const turn = turnRef.current;
+      updateCaptions((c) => {
+        const l = c[c.length - 1];
+        if (l && l.role === "assistant" && l.turn === turn && !l.interrupted) return [...c.slice(0, -1), { ...l, text: l.text + delta }];
+        return [...c, { role: "assistant", text: delta, turn }];
       });
     },
   });
   const inCall = voice.status === "connecting" || voice.status === "connected" || voice.status === "stopping";
+
+  // Persist the voice call into this thread once it ends, then show it in the history.
+  useEffect(() => {
+    if (voice.status !== "closed") return;
+    const turns = turnsRef.current.filter((t) => t.text.trim()).map((t) => ({ role: t.role, content: t.interrupted ? `${t.text.trim()} — (interrupted)` : t.text.trim() }));
+    turnsRef.current = [];
+    if (!turns.length) return;
+    void appendVoiceTurns({ data: { visitorId, threadId, turns } }).then(async () => {
+      const t = await getThread({ data: { visitorId, threadId } });
+      if (t) setMessages(t.messages.map((m) => ({ id: m.id, role: m.role as Msg["role"], content: m.content, sources: m.sources ? (JSON.parse(m.sources) as Source[]) : undefined, debug: m.debug ? (JSON.parse(m.debug) as Debug) : undefined })));
+      qc.invalidateQueries({ queryKey: ["threads"] });
+    }).catch(() => {});
+  }, [voice.status, visitorId, threadId, qc]);
+
+  const lastDebug = [...messages].reverse().find((m) => m.role === "assistant" && m.debug?.timingsMs)?.debug;
+  const startCall = () => { speech.stop(); turnsRef.current = []; setCaptions([]); turnRef.current = 0; dropAssistantRef.current = false; voice.start(); };
 
   useEffect(() => {
     getThread({ data: { visitorId, threadId } }).then((t) => {
