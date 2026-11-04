@@ -19,6 +19,8 @@ export function useSpeech() {
   const tokenRef = useRef(0);
   const ttfaRef = useRef<number | null>(null);
   const [ttfaMs, setTtfaMs] = useState<number | null>(null);
+  const ttfbRef = useRef<number | null>(null);
+  const [ttfbMs, setTtfbMs] = useState<number | null>(null);
 
   const stop = useCallback(() => {
     tokenRef.current += 1;
@@ -66,6 +68,7 @@ export function useSpeech() {
           body: JSON.stringify({ text: part }),
           signal: ac.signal,
         });
+        if (ttfbRef.current === null) { ttfbRef.current = Math.round(performance.now() - t0); setTtfbMs(ttfbRef.current); }
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(j.error ?? "Could not generate audio");
@@ -89,6 +92,7 @@ export function useSpeech() {
         });
       try {
         ttfaRef.current = null;
+        ttfbRef.current = null;
         const firstP = fetchWav(first);
         const restP = rest ? fetchWav(rest) : null;
         restP?.catch(() => {});
@@ -113,5 +117,5 @@ export function useSpeech() {
 
   useEffect(() => stop, [stop]);
 
-  return { id, state, error, ttfaMs, speak, stop, clearError: () => setError(null) };
+  return { id, state, error, ttfaMs, ttfbMs, speak, stop, clearError: () => setError(null) };
 }
