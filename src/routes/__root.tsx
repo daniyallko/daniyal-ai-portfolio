@@ -117,6 +117,29 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith("/admin") || path.startsWith("/auth")) return;
+    void import("@/lib/visit.functions").then(async ({ trackVisit }) => {
+      const { getVisitorId } = await import("@/lib/visitor");
+      await trackVisit({ data: { visitorId: getVisitorId(), path, referrer: document.referrer.slice(0, 500) || undefined, language: navigator.language } });
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    void import("@/integrations/supabase/client").then(({ supabase }) => {
+      const { data } = supabase.auth.onAuthStateChange((event) => {
+        if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+        router.invalidate();
+        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      });
+      unsub = () => data.subscription.unsubscribe();
+    });
+    return () => unsub?.();
+  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
