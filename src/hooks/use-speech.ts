@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { prepareForSpeech } from "@/lib/speech";
-import { firstClauseSplit } from "@/lib/voice-logic";
+import { polyglotFirstClause } from "@/lib/language";
 
 export type SpeakState = "idle" | "loading" | "playing";
 
@@ -8,7 +8,16 @@ export type SpeakState = "idle" | "loading" | "playing";
  * Read-aloud playback for one answer at a time.
  * Clicking the same answer again stops it; starting another answer stops the first.
  */
-export function useSpeech() {
+export type SpeechVoice = { voice: string; lang: string | null };
+type Override = Partial<SpeechVoice>;
+
+export function useSpeech(config: SpeechVoice) {
+  const configRef = useRef(config);
+  configRef.current = config;
+  const lastRef = useRef<{ key: string; segments: string[]; override?: Override } | null>(null);
+  const segRef = useRef(0);
+  const [delimiter, setDelimiter] = useState<string | null>(null);
+  const [swaps, setSwaps] = useState(0);
   const [id, setId] = useState<string | null>(null);
   const [state, setState] = useState<SpeakState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +53,8 @@ export function useSpeech() {
   }, []);
 
   const speak = useCallback(
-    async (key: string, text: string) => {
-      if (idRef.current === key) {
+    async (key: string, text: string, override?: Override, opts: { force?: boolean; prepared?: boolean } = {}) => {
+      if (idRef.current === key && !opts.force) {
         stop();
         return;
       }
@@ -60,12 +69,16 @@ export function useSpeech() {
       const t0 = performance.now();
       // Adaptive first-clause chunking: synthesize a short opening clause and the rest in parallel,
       // so audio starts as soon as the small first chunk is ready.
-      const [first, rest] = firstClauseSplit(prepareForSpeech(text));
+      const fc = polyglotFirstClause(opts.prepared ? text : prepareForSpeech(text));
+      const { first, rest } = fc;
+      if (!opts.force) setDelimiter(fc.delimiter);
+      lastRef.current = { key, segments: rest ? [first, rest] : [first], ...(override ? { override } : {}) };
+      segRef.current = 0;
       const fetchWav = async (part: string) => {
         const res = await fetch("/api/speak", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: part }),
+          body: JSON.stringify({ text: part, voice: override?.voice ?? configRef.current.voice, lang: override?.lang ?? configRef.current.lang }),
           signal: ac.signal,
         });
         if (ttfbRef.current === null) { ttfbRef.current = Math.round(performance.now() - t0); setTtfbMs(ttfbRef.current); }
@@ -100,6 +113,7 @@ export function useSpeech() {
         if (token !== tokenRef.current) return;
         await play(a);
         if (token !== tokenRef.current) return;
+        segRef.current = 1;
         if (restP) {
           const b = await restP;
           if (token !== tokenRef.current) return;
@@ -117,5 +131,17 @@ export function useSpeech() {
 
   useEffect(() => stop, [stop]);
 
-  return { id, state, error, ttfaMs, ttfbMs, speak, stop, clearError: () => setError(null) };
+  /** Voice changed mid-answer: drop queued audio and re-synthesize the unplayed clauses with the new voice. */
+  const hotSwap = useCallback(() => {
+    const last = lastRef.current;
+    const key = idRef.current;
+    if (!last || !key || last.override || key.startsWith("preview:")) return false;
+    const remaining = last.segments.slice(segRef.current).join(" ");
+    if (!remaining) return false;
+    setSwaps((n) => n + 1);
+    void speak(key, remaining, undefined, { force: true, prepared: true });
+    return true;
+  }, [speak]);
+
+  return { id, state, error, ttfaMs, ttfbMs, delimiter, swaps, speak, stop, hotSwap, clearError: () => setError(null) };
 }
