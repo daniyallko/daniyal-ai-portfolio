@@ -39,7 +39,7 @@ function useCoBrowse() {
     if (hl) { const el = document.getElementById(hl); if (el) targets.push(el); }
     if (skill) {
       document.querySelectorAll<HTMLElement>("[data-skill]").forEach((el) => {
-        if (el.dataset.skill!.toLowerCase().includes(skill) || el.dataset.group!.toLowerCase().includes(skill)) targets.push(el);
+        if (el.dataset["skill"]!.toLowerCase().includes(skill) || el.dataset["group"]!.toLowerCase().includes(skill)) targets.push(el);
       });
     }
     if (!targets.length) return;

@@ -322,7 +322,7 @@ function createLiveVoice(options: LiveOptions) {
     channel?.close();
     peer?.close();
     socket?.close();
-    options.onEvent({ type: "app.closed", finalized, reason: endReason });
+    options.onEvent({ type: "app.closed", finalized, ...(endReason ? { reason: endReason } : {}) });
   }
 
   function stop() {
