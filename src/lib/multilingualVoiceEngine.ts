@@ -107,7 +107,7 @@ export class PolyglotAdaptiveChunker {
   private buffer = "";
   private isFirstClauseFlushed = false;
   public lastFlushDelimiter = "none";
-  private static SENTENCE_END_REGEX = /([.!?;:।॥。！？；؟]+)(\s+|$)/;
+  private static SENTENCE_END_REGEX = /([.!?;:।॥؟]+(?=\s|$)|[。！？；]+)/; // CJK needs no trailing space
   private static FIRST_CLAUSE_REGEX = /([,،、—–]|\s+(?:and|or|because|so|और|या|क्योंकि|तो|aur|kyunki|y|porque|et)\s+)/i;
 
   public pushToken(token: string): string[] {
