@@ -67,6 +67,25 @@ export function liveVoiceDev(): Plugin {
       if (!httpServer) throw new Error("Live voice preview requires Vite's HTTP server");
       const sockets = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
       let disposed = false;
+      // Some dev runtimes don't expose ssrLoadModule; fall back to a native import of the relay.
+      let relayPromise: Promise<typeof import("./src/lib/live-relay.server")> | undefined;
+      const loadRelay = async (): Promise<typeof import("./src/lib/live-relay.server")> => {
+        try {
+          return (await server.ssrLoadModule("/src/lib/live-relay.server.ts")) as typeof import("./src/lib/live-relay.server");
+        } catch {
+          // Vite's runnerImport resolves the "@/" alias without a running SSR environment.
+          relayPromise ??= import("vite").then(async ({ runnerImport }) => {
+            const root = process.cwd();
+            const r = await runnerImport<typeof import("./src/lib/live-relay.server")>(`${root}/src/lib/live-relay.server.ts`, {
+              configFile: false,
+              root,
+              resolve: { alias: { "@": `${root}/src` } },
+            });
+            return r.module;
+          });
+          return await relayPromise;
+        }
+      };
       const upgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
         if (request.url?.split("?", 1)[0] !== "/api/live") return;
         socket.on("error", () => {});
@@ -74,9 +93,7 @@ export function liveVoiceDev(): Plugin {
         timer.unref();
         void (async () => {
           try {
-            const relay = (await server.ssrLoadModule(
-              "/src/lib/live-relay.server.ts",
-            )) as typeof import("./src/lib/live-relay.server");
+            const relay = await loadRelay();
             const config = relay.getLiveConfig(request.url);
             const rejection = relay.validateLiveUpgrade(upgradeRequest(request), { allowMissingOrigin: true });
             if (rejection) return rejectUpgrade(socket, rejection.status);
@@ -89,7 +106,8 @@ export function liveVoiceDev(): Plugin {
                 },
               });
             });
-          } catch {
+          } catch (error) {
+            console.error("live voice upgrade failed", error);
             rejectUpgrade(socket, 503);
           } finally {
             clearTimeout(timer);
