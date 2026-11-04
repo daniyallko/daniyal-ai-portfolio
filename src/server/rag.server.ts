@@ -2,6 +2,7 @@ import { generateEmbeddings } from "@lovable.dev/ai-gateway";
 import { buildChunks, type Chunk } from "@/lib/portfolio";
 import { normalizeQueryKey } from "@/lib/voice-logic";
 import { bridgeQuery } from "@/lib/language";
+import { detectLanguageAndRegister, normalizeCrossLingualRagQuery } from "@/lib/multilingualVoiceEngine";
 import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
 
 const EMBED_MODEL = "google/gemini-embedding-2";
@@ -52,10 +53,14 @@ const CACHE_TTL = 5 * 60_000;
 const warm = new Map<string, { at: number; value: Promise<{ sources: Source[]; debug: RetrievalDebug }> }>();
 
 export async function retrieve(rawQuery: string, topK = 5): Promise<{ sources: Source[]; debug: RetrievalDebug & { cache?: "hit" | "miss" } }> {
-  // Cross-lingual bridge: non-English queries gain canonical English search terms.
+  // Cross-lingual bridge: non-English queries gain canonical English search terms (deterministic, no LLM).
   const b = bridgeQuery(rawQuery);
-  const query = b.normalized;
-  const bridge = { raw: rawQuery, tokens: b.tokens, normalized: b.normalized, ms: b.ms };
+  const isEnglish = detectLanguageAndRegister(rawQuery).langCode === "en";
+  const n = isEnglish ? null : normalizeCrossLingualRagQuery(rawQuery);
+  const extra = n ? n.englishSearchQuery.split(" ").filter((t) => !b.tokens.includes(t)) : [];
+  const tokens = [...b.tokens, ...extra];
+  const query = extra.length ? `${b.normalized} ${extra.join(" ")}` : b.normalized;
+  const bridge = { raw: rawQuery, tokens, normalized: query, ms: +(b.ms + (n?.normalizationTimeMs ?? 0)).toFixed(2) };
   const key = `${topK}:${normalizeQueryKey(query)}`;
   const now = Date.now();
   for (const [k, v] of warm) if (now - v.at > CACHE_TTL) warm.delete(k);
