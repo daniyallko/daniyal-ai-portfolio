@@ -68,11 +68,22 @@ export function liveVoiceDev(): Plugin {
       const sockets = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
       let disposed = false;
       // Some dev runtimes don't expose ssrLoadModule; fall back to a native import of the relay.
+      let relayPromise: Promise<typeof import("./src/lib/live-relay.server")> | undefined;
       const loadRelay = async (): Promise<typeof import("./src/lib/live-relay.server")> => {
         try {
           return (await server.ssrLoadModule("/src/lib/live-relay.server.ts")) as typeof import("./src/lib/live-relay.server");
         } catch {
-          return await import("./src/lib/live-relay.server");
+          // Vite's runnerImport resolves the "@/" alias without a running SSR environment.
+          relayPromise ??= import("vite").then(async ({ runnerImport }) => {
+            const root = process.cwd();
+            const r = await runnerImport<typeof import("./src/lib/live-relay.server")>(`${root}/src/lib/live-relay.server.ts`, {
+              configFile: false,
+              root,
+              resolve: { alias: { "@": `${root}/src` } },
+            });
+            return r.module;
+          });
+          return await relayPromise;
         }
       };
       const upgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
