@@ -104,7 +104,7 @@ function Meter({ value, max }: { value: number; max: number }) {
 }
 
 type Check = { name: string; status: "idle" | "running" | "pass" | "fail"; detail: string };
-const CHECKS = ["AudioWorklet registration", "Mic AEC constraints", "Speculative RAG cache (<50ms)", "Turn-ID barge-in cancellation", "Generative UI scroll dispatch"];
+const CHECKS = ["AudioWorklet registration", "Mic AEC constraints", "Speculative RAG cache (<50ms)", "Turn-ID barge-in cancellation", "Generative UI scroll dispatch", "Background noise ignored (no false interrupt)"];
 
 const withTimeout = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<T>((_, r) => setTimeout(() => r(new Error(`timed out after ${ms}ms`)), ms))]);
 
@@ -171,6 +171,38 @@ async function checkBargeIn(): Promise<string> {
   } finally { void ctx.close(); }
 }
 
+async function checkNoiseRejection(): Promise<string> {
+  const ctx = new AudioContext();
+  try {
+    await ctx.audioWorklet.addModule("/voice-worklets.js");
+    await ctx.resume();
+    const vad = new AudioWorkletNode(ctx, "vad-processor");
+    const sink = ctx.createGain(); sink.gain.value = 0;
+    vad.connect(sink).connect(ctx.destination);
+    let onsets = 0;
+    vad.port.onmessage = ({ data }) => { if (data.type === "onset") onsets++; };
+    // 1) Knocks: five 40ms noise bursts, 300ms apart.
+    const burst = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.04), ctx.sampleRate);
+    const d = burst.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.6 * Math.exp(-i / (d.length / 4));
+    for (let k = 0; k < 5; k++) {
+      const src = ctx.createBufferSource(); src.buffer = burst; src.connect(vad);
+      src.start(ctx.currentTime + 0.1 + k * 0.3);
+    }
+    await new Promise((r) => setTimeout(r, 1800));
+    const knockOnsets = onsets;
+    // 2) Sustained voice-like tone (harmonic-rich, 160Hz) for 600ms.
+    const osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 160;
+    const g = ctx.createGain(); g.gain.value = 0.15;
+    osc.connect(g).connect(vad); osc.start(); osc.stop(ctx.currentTime + 0.6);
+    await new Promise((r) => setTimeout(r, 900));
+    const voiceOnsets = onsets - knockOnsets;
+    if (knockOnsets > 0) throw new Error(`${knockOnsets} false interruption(s) from knock sounds`);
+    if (voiceOnsets < 1) throw new Error("sustained voice-like sound did not trigger");
+    return "5 knocks ignored · sustained voice detected";
+  } finally { void ctx.close(); }
+}
+
 async function checkDispatch(): Promise<string> {
   const action = detectActions("Tell me about AI BotKit")[0];
   if (!action) throw new Error("no action detected");
@@ -192,7 +224,7 @@ async function checkDispatch(): Promise<string> {
   } finally { frame.remove(); }
 }
 
-const RUNNERS = [checkWorklet, checkMic, checkCache, checkBargeIn, checkDispatch];
+const RUNNERS = [checkWorklet, checkMic, checkCache, checkBargeIn, checkDispatch, checkNoiseRejection];
 
 const ML_CHECKS = ["Engine: Hinglish detect (hi, code-switched)", "Engine: cross-lingual normalize (<5ms)", "Engine: chunker splits on । and 。", "Cross-lingual RAG bridge (Hindi → English, <50ms)", "Polyglot clause split (। and 。)", "Mid-turn voice hot-swap (no underruns)"];
 const HINDI_Q = "मुझे आपके Kubernetes और Terraform प्रोजेक्ट्स के बारे में बताइए";

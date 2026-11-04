@@ -1,39 +1,50 @@
 // AudioWorklet processors for the live voice call. Runs off the main thread.
 
-// Spectral-energy + zero-crossing-rate voice activity detector.
-// 128-sample frames (~2.7ms @48k); onset after 8 voiced frames (~21ms @48k).
+// Speech-only voice activity detector (energy + zero-crossing rate + crest factor + duration).
+// Knocks, clicks and object sounds are short, peaky bursts; speech is sustained and smooth.
+// A frame is "voiced" only if it is loud relative to the noise floor, has a speech-like ZCR
+// and a low peak-to-RMS ratio. Onset needs ~180ms of voiced audio inside a 250ms window.
 class VadProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.floor = 0.004;
-    this.run = 0;
+    this.voicedMs = 0;
     this.speaking = false;
     this.silentMs = 0;
     this.n = 0;
+    this.zcrAvg = 0.1;
   }
   process(inputs) {
     const ch = inputs[0] && inputs[0][0];
     if (!ch) return true;
-    let e = 0, z = 0;
+    let e = 0, z = 0, peak = 0;
     for (let i = 0; i < ch.length; i++) {
+      const a = Math.abs(ch[i]);
       e += ch[i] * ch[i];
+      if (a > peak) peak = a;
       if (i && (ch[i] >= 0) !== (ch[i - 1] >= 0)) z++;
     }
     const rms = Math.sqrt(e / ch.length);
     const zcr = z / ch.length;
+    const crest = rms > 0 ? peak / rms : 99;
     const frameMs = (ch.length / sampleRate) * 1000;
-    if (!this.speaking) this.floor = this.floor * 0.995 + Math.min(rms, 0.05) * 0.005;
-    const voiced = rms > Math.max(0.015, this.floor * 3) && zcr > 0.005 && zcr < 0.4;
-    if (voiced) { this.run++; this.silentMs = 0; } else { this.run = 0; this.silentMs += frameMs; }
-    if (!this.speaking && this.run >= 8) {
+    // Minimum-tracking noise floor: drops fast to quiet, rises slowly (~3s) so speech doesn't raise it.
+    if (!this.speaking) this.floor = rms < this.floor ? this.floor * 0.9 + rms * 0.1 : Math.min(0.05, this.floor * 0.9995 + rms * 0.0005);
+    this.zcrAvg = this.zcrAvg * 0.9 + zcr * 0.1;
+    const voiced = rms > Math.max(0.02, this.floor * 4) && this.zcrAvg > 0.004 && this.zcrAvg < 0.25 && crest < 8;
+    // Leaky integrator: voiced frames add time, other frames drain it faster.
+    this.voicedMs = voiced ? Math.min(250, this.voicedMs + frameMs) : Math.max(0, this.voicedMs - frameMs * 1.5);
+    if (voiced) this.silentMs = 0; else this.silentMs += frameMs;
+    if (!this.speaking && this.voicedMs >= 180) {
       this.speaking = true;
-      this.port.postMessage({ type: "onset", detectMs: this.run * frameMs });
+      this.port.postMessage({ type: "onset", detectMs: this.voicedMs });
     }
-    if (this.speaking && this.silentMs > 250) {
+    if (this.speaking && this.silentMs > 300) {
       this.speaking = false;
+      this.voicedMs = 0;
       this.port.postMessage({ type: "offset" });
     }
-    if (++this.n % 6 === 0) this.port.postMessage({ type: "level", rms, zcr, speaking: this.speaking, silentMs: this.silentMs, floor: this.floor });
+    if (++this.n % 6 === 0) this.port.postMessage({ type: "level", rms, zcr, speaking: this.speaking, silentMs: this.silentMs, floor: this.floor, crest, voicedMs: this.voicedMs });
     return true;
   }
 }
