@@ -10,6 +10,44 @@ export type LiveEvent = {
   [key: string]: unknown;
 };
 
+export type VoiceTelemetry = {
+  sessionId: string;
+  turnId: number;
+  micRms: number;
+  zcr: number;
+  vad: "speech" | "silence";
+  silenceMs: number;
+  onsetDetectMs: number | null;
+  bufferMs: number;
+  outRms: number;
+  underruns: number;
+  playedMs: number;
+  assistantSpeaking: boolean;
+  ducked: boolean;
+  bargeIns: number;
+  lastBargeCutMs: number | null;
+  ttfaMs: number | null;
+  connectedAt: number | null;
+  lastActivity: number;
+  maxMs: number;
+  idleMs: number;
+  worklet: boolean;
+  micAnalyser: AnalyserNode | null;
+  outAnalyser: AnalyserNode | null;
+};
+
+export const VOICE_IDLE_MS = 15_000;
+export const VOICE_MAX_MS = 5 * 60_000;
+
+function newTelemetry(): VoiceTelemetry {
+  return {
+    sessionId: crypto.randomUUID(), turnId: 0, micRms: 0, zcr: 0, vad: "silence", silenceMs: 0, onsetDetectMs: null,
+    bufferMs: 0, outRms: 0, underruns: 0, playedMs: 0, assistantSpeaking: false, ducked: false, bargeIns: 0,
+    lastBargeCutMs: null, ttfaMs: null, connectedAt: null, lastActivity: Date.now(), maxMs: VOICE_MAX_MS,
+    idleMs: VOICE_IDLE_MS, worklet: false, micAnalyser: null, outAnalyser: null,
+  };
+}
+
 type LiveState = {
   status: "idle" | "connecting" | "connected" | "stopping" | "closed";
   error: string | null;
@@ -17,6 +55,8 @@ type LiveState = {
   finalized: boolean | null;
   muted: boolean;
   playbackBlocked: boolean;
+  outputMuted: boolean;
+  endReason: "idle" | "budget" | null;
 };
 
 const initialState: LiveState = {
@@ -26,6 +66,8 @@ const initialState: LiveState = {
   finalized: null,
   muted: false,
   playbackBlocked: false,
+  outputMuted: false,
+  endReason: null,
 };
 
 export function useLiveVoice(
@@ -39,6 +81,7 @@ export function useLiveVoice(
   const mounted = useRef(false);
   const latest = useRef(options);
   const [call, setCall] = useState(initialState);
+  const telemetry = useRef<VoiceTelemetry>(newTelemetry());
 
   useEffect(() => {
     latest.current = options;
@@ -69,9 +112,11 @@ export function useLiveVoice(
       setCall((previous) => ({ ...previous, error: "Invalid voice connection URL." }));
       return;
     }
+    telemetry.current = newTelemetry();
     const voice = createLiveVoice({
       url: endpoint.href,
       audio,
+      telemetry: telemetry.current,
       onEvent(event) {
         if (!mounted.current || controller.current !== voice) return;
         if (event.type === "app.connected") {
@@ -86,6 +131,8 @@ export function useLiveVoice(
             muted: false,
             playbackBlocked: false,
             finalized: event.finalized === true,
+            outputMuted: false,
+            endReason: event.reason === "idle" || event.reason === "budget" ? event.reason : null,
           }));
         } else if (event.type === "app.playback.blocked" || event.type === "app.playback.resumed") {
           setCall((previous) => ({ ...previous, playbackBlocked: event.type === "app.playback.blocked" }));
@@ -112,16 +159,20 @@ export function useLiveVoice(
   const setMuted = useCallback((muted: boolean) => {
     if (controller.current?.setMuted(muted)) setCall((previous) => ({ ...previous, muted }));
   }, []);
+  const setOutputMuted = useCallback((on: boolean) => {
+    if (controller.current?.setOutputMuted(on)) setCall((previous) => ({ ...previous, outputMuted: on }));
+  }, []);
   const resumePlayback = useCallback(() => {
     void controller.current?.resumePlayback();
   }, []);
 
-  return { ...call, audioRef, start, stop, setMuted, resumePlayback };
+  return { ...call, audioRef, telemetry, start, stop, setMuted, setOutputMuted, resumePlayback };
 }
 
 type LiveOptions = {
   url: string;
   audio: HTMLAudioElement;
+  telemetry: VoiceTelemetry;
   onEvent: (event: LiveEvent) => void;
 };
 
@@ -140,6 +191,105 @@ function createLiveVoice(options: LiveOptions) {
   let answerReceived = false;
   let finalized = false;
   let muted = false;
+  let outputMuted = false;
+  let endReason: "idle" | "budget" | undefined;
+  const tel = options.telemetry;
+  let ctx: AudioContext | undefined;
+  let workletReady: Promise<void> | undefined;
+  let player: AudioWorkletNode | undefined;
+  let lastOutAt = 0;
+  let bargeAt = 0;
+  let userTranscriptSinceBarge = false;
+  let userEndAt: number | null = null;
+
+  function setDuck(on: boolean) {
+    tel.ducked = on;
+    player?.port.postMessage({ type: "duck", on });
+  }
+
+  // Instant barge-in: flush the ring buffer and drop the rest of the interrupted turn.
+  function onVadOnset(detectMs: number) {
+    tel.onsetDetectMs = detectMs;
+    tel.turnId += 1;
+    tel.lastActivity = Date.now();
+    userEndAt = null;
+    if (state !== "active" || !player || tel.ducked) return;
+    if (performance.now() - lastOutAt > 250) return;
+    const t0 = performance.now();
+    player.port.postMessage({ type: "flush" });
+    setDuck(true);
+    tel.lastBargeCutMs = +(detectMs + (performance.now() - t0)).toFixed(1);
+    tel.bargeIns += 1;
+    bargeAt = performance.now();
+    userTranscriptSinceBarge = false;
+    options.onEvent({ type: "app.barge_in", turnId: tel.turnId, playedMs: tel.playedMs });
+  }
+
+  function onPlayerLevel(d: { rms: number; inRms: number; fillMs: number; underruns: number; playedMs: number }) {
+    const now = performance.now();
+    tel.outRms = d.rms;
+    tel.bufferMs = d.fillMs;
+    tel.underruns = d.underruns;
+    tel.playedMs = d.playedMs;
+    if (d.inRms > 0.008) lastOutAt = now;
+    tel.assistantSpeaking = now - lastOutAt < 250;
+    if (d.rms > 0.01) {
+      tel.lastActivity = Date.now();
+      if (userEndAt !== null) { tel.ttfaMs = Math.round(now - userEndAt); userEndAt = null; }
+    }
+    if (tel.ducked) {
+      const sinceBarge = now - bargeAt;
+      const serverStopped = userTranscriptSinceBarge && now - lastOutAt > 200;
+      const falseAlarm = !userTranscriptSinceBarge && tel.vad === "silence" && sinceBarge > 900;
+      if ((serverStopped && sinceBarge > 300) || falseAlarm || sinceBarge > 8000) setDuck(false);
+    }
+  }
+
+  async function setupMic(stream: MediaStream) {
+    if (!ctx || !workletReady) return;
+    try {
+      await workletReady;
+      const src = ctx.createMediaStreamSource(stream);
+      const vad = new AudioWorkletNode(ctx, "vad-processor");
+      const an = ctx.createAnalyser();
+      an.fftSize = 512;
+      src.connect(an);
+      src.connect(vad);
+      tel.micAnalyser = an;
+      vad.port.onmessage = ({ data }) => {
+        if (data.type === "onset") { tel.vad = "speech"; onVadOnset(data.detectMs); }
+        else if (data.type === "offset") { tel.vad = "silence"; userEndAt = performance.now(); }
+        else if (data.type === "level") {
+          tel.micRms = data.rms; tel.zcr = data.zcr; tel.silenceMs = Math.round(data.silentMs);
+          if (data.speaking) tel.lastActivity = Date.now();
+        }
+      };
+    } catch {
+      tel.micAnalyser = null;
+    }
+  }
+
+  async function setupPlayback(stream: MediaStream) {
+    if (!ctx || !workletReady) return false;
+    try {
+      await workletReady;
+      if (state === "stopping" || state === "closed") return false;
+      const src = ctx.createMediaStreamSource(stream);
+      const node = new AudioWorkletNode(ctx, "ring-player", { outputChannelCount: [1] });
+      const an = ctx.createAnalyser();
+      an.fftSize = 512;
+      src.connect(node).connect(an).connect(ctx.destination);
+      node.port.onmessage = ({ data }) => { if (data.type === "level") onPlayerLevel(data); };
+      node.port.postMessage({ type: "mute", on: outputMuted });
+      player = node;
+      tel.outAnalyser = an;
+      tel.worklet = true;
+      void ctx.resume();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   function starting() {
     return state === "starting";
@@ -155,6 +305,10 @@ function createLiveVoice(options: LiveOptions) {
       options.audio.pause();
       options.audio.srcObject = null;
     }
+    player?.port.postMessage({ type: "flush" });
+    player = undefined;
+    void ctx?.close().catch(() => {});
+    ctx = undefined;
   }
 
   function release() {
@@ -168,7 +322,7 @@ function createLiveVoice(options: LiveOptions) {
     channel?.close();
     peer?.close();
     socket?.close();
-    options.onEvent({ type: "app.closed", finalized });
+    options.onEvent({ type: "app.closed", finalized, ...(endReason ? { reason: endReason } : {}) });
   }
 
   function stop() {
@@ -197,10 +351,19 @@ function createLiveVoice(options: LiveOptions) {
     return true;
   }
 
+  function setOutputMuted(value: boolean) {
+    if (state !== "starting" && state !== "active") return false;
+    outputMuted = value;
+    if (player) player.port.postMessage({ type: "mute", on: value });
+    else options.audio.muted = value;
+    return true;
+  }
+
   async function resumePlayback() {
     if ((state !== "starting" && state !== "active") || !options.audio.srcObject) return;
     try {
       await options.audio.play();
+      await ctx?.resume();
       if (state === "starting" || state === "active") options.onEvent({ type: "app.playback.resumed" });
     } catch {
       if (state === "starting" || state === "active") options.onEvent({ type: "app.playback.blocked" });
@@ -237,6 +400,9 @@ function createLiveVoice(options: LiveOptions) {
     if (state !== "active") return;
     if (Date.now() - lastAck >= 5000) return fail("Voice control connection lost");
     if (Date.now() - lastHeartbeat >= 5000) return fail("Voice media connection lost");
+    const nowMs = Date.now();
+    if (tel.connectedAt && nowMs - tel.connectedAt >= tel.maxMs) { endReason = "budget"; return stop(); }
+    if (nowMs - tel.lastActivity >= tel.idleMs) { endReason = "idle"; return stop(); }
     if (!mediaReady()) return;
     try {
       send({ type: "gateway.heartbeat" });
@@ -253,6 +419,8 @@ function createLiveVoice(options: LiveOptions) {
       clearTimeout(deadline);
       lastAck = Date.now();
       lastHeartbeat = Date.now();
+      tel.connectedAt = Date.now();
+      tel.lastActivity = Date.now();
       heartbeat = setInterval(pulse, 1000);
       pulse();
       if (state !== "active") return;
@@ -301,14 +469,23 @@ function createLiveVoice(options: LiveOptions) {
     state = "starting";
     window.addEventListener("pagehide", stop);
     try {
+      // Created inside the user's click so playback is allowed.
+      ctx = new AudioContext({ latencyHint: "interactive" });
+      workletReady = ctx.audioWorklet.addModule("/voice-worklets.js");
+      workletReady.catch(() => {});
+    } catch {
+      ctx = undefined;
+    }
+    try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 24000 },
       });
       microphone = stream;
       if (!starting()) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
+      void setupMic(stream);
       const connection = new RTCPeerConnection();
       peer = connection;
       for (const track of stream.getAudioTracks()) {
@@ -320,7 +497,13 @@ function createLiveVoice(options: LiveOptions) {
         if (state === "stopping" || state === "closed") return;
         playback = new MediaStream([track]);
         options.audio.srcObject = playback;
-        void resumePlayback();
+        // Chrome only feeds remote WebRTC audio into Web Audio when an element holds the stream;
+        // keep it muted and play through the AudioWorklet ring buffer instead.
+        options.audio.muted = true;
+        void setupPlayback(playback).then((ok) => {
+          if (!ok) options.audio.muted = outputMuted;
+          void resumePlayback();
+        });
       });
       connection.addEventListener("connectionstatechange", () => {
         if (connection.connectionState === "failed") fail("Voice media connection failed. Start a new call to retry.");
@@ -360,6 +543,9 @@ function createLiveVoice(options: LiveOptions) {
             void applyAnswer(event).catch(() => fail("Voice media negotiation failed"));
           } else if (event.type === "session.started") {
             activate();
+          } else if (event.type === "session.input_transcript.delta") {
+            userTranscriptSinceBarge = true;
+            tel.lastActivity = Date.now();
           } else if (event.type === "gateway.heartbeat.ack") {
             lastAck = Date.now();
           } else if (event.type === "session.closed") {
@@ -396,5 +582,5 @@ function createLiveVoice(options: LiveOptions) {
     }
   }
 
-  return { start, stop, setMuted, resumePlayback };
+  return { start, stop, setMuted, setOutputMuted, resumePlayback };
 }

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { prepareForSpeech } from "@/lib/speech";
+import { firstClauseSplit } from "@/lib/voice-logic";
 
 export type SpeakState = "idle" | "loading" | "playing";
 
@@ -15,6 +17,8 @@ export function useSpeech() {
   const urlRef = useRef<string | null>(null);
   const acRef = useRef<AbortController | null>(null);
   const tokenRef = useRef(0);
+  const ttfaRef = useRef<number | null>(null);
+  const [ttfaMs, setTtfaMs] = useState<number | null>(null);
 
   const stop = useCallback(() => {
     tokenRef.current += 1;
@@ -51,34 +55,53 @@ export function useSpeech() {
       setState("loading");
       const ac = new AbortController();
       acRef.current = ac;
-      try {
+      const t0 = performance.now();
+      // Adaptive first-clause chunking: synthesize a short opening clause and the rest in parallel,
+      // so audio starts as soon as the small first chunk is ready.
+      const [first, rest] = firstClauseSplit(prepareForSpeech(text));
+      const fetchWav = async (part: string) => {
         const res = await fetch("/api/speak", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text: part }),
           signal: ac.signal,
         });
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(j.error ?? "Could not generate audio");
         }
-        const blob = await res.blob();
+        return res.blob();
+      };
+      const play = (blob: Blob) =>
+        new Promise<void>((resolve, reject) => {
+          if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+          const url = URL.createObjectURL(blob);
+          urlRef.current = url;
+          const audio = new Audio(url);
+          audioRef.current = audio;
+          audio.onended = () => resolve();
+          audio.onerror = () => reject(new Error("Playback failed"));
+          audio.play().then(() => {
+            if (token !== tokenRef.current) return;
+            if (ttfaRef.current === null) { ttfaRef.current = Math.round(performance.now() - t0); setTtfaMs(ttfaRef.current); }
+            setState("playing");
+          }, reject);
+        });
+      try {
+        ttfaRef.current = null;
+        const firstP = fetchWav(first);
+        const restP = rest ? fetchWav(rest) : null;
+        restP?.catch(() => {});
+        const a = await firstP;
         if (token !== tokenRef.current) return;
-        const url = URL.createObjectURL(blob);
-        urlRef.current = url;
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => {
-          if (token === tokenRef.current) stop();
-        };
-        audio.onerror = () => {
+        await play(a);
+        if (token !== tokenRef.current) return;
+        if (restP) {
+          const b = await restP;
           if (token !== tokenRef.current) return;
-          setError("Playback failed");
-          stop();
-        };
-        await audio.play();
-        if (token !== tokenRef.current) return;
-        setState("playing");
+          await play(b);
+        }
+        if (token === tokenRef.current) stop();
       } catch (e) {
         if (ac.signal.aborted || (e as Error).name === "AbortError" || token !== tokenRef.current) return;
         setError((e as Error).message || "Could not generate audio");
@@ -90,5 +113,5 @@ export function useSpeech() {
 
   useEffect(() => stop, [stop]);
 
-  return { id, state, error, speak, stop, clearError: () => setError(null) };
+  return { id, state, error, ttfaMs, speak, stop, clearError: () => setError(null) };
 }

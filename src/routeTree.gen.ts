@@ -14,6 +14,7 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as EvalRouteImport } from './routes/eval'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiEvalRouteImport } from './routes/api/eval'
+import { Route as ApiPrefetchRouteImport } from './routes/api/prefetch'
 import { Route as ApiSpeakRouteImport } from './routes/api/speak'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
@@ -44,6 +45,11 @@ const ApiEvalRoute = ApiEvalRouteImport.update({
   path: '/api/eval',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPrefetchRoute = ApiPrefetchRouteImport.update({
+  id: '/api/prefetch',
+  path: '/api/prefetch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSpeakRoute = ApiSpeakRouteImport.update({
   id: '/api/speak',
   path: '/api/speak',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/eval': typeof EvalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
+  '/api/prefetch': typeof ApiPrefetchRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/eval': typeof EvalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
+  '/api/prefetch': typeof ApiPrefetchRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/eval': typeof EvalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
+  '/api/prefetch': typeof ApiPrefetchRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/eval'
     | '/api/chat'
     | '/api/eval'
+    | '/api/prefetch'
     | '/api/speak'
     | '/api/transcribe'
     | '/chat/$threadId'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/eval'
     | '/api/chat'
     | '/api/eval'
+    | '/api/prefetch'
     | '/api/speak'
     | '/api/transcribe'
     | '/chat/$threadId'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/eval'
     | '/api/chat'
     | '/api/eval'
+    | '/api/prefetch'
     | '/api/speak'
     | '/api/transcribe'
     | '/chat/$threadId'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   EvalRoute: typeof EvalRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiEvalRoute: typeof ApiEvalRoute
+  ApiPrefetchRoute: typeof ApiPrefetchRoute
   ApiSpeakRoute: typeof ApiSpeakRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       path: '/api/eval'
       fullPath: '/api/eval'
       preLoaderRoute: typeof ApiEvalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/prefetch': {
+      id: '/api/prefetch'
+      path: '/api/prefetch'
+      fullPath: '/api/prefetch'
+      preLoaderRoute: typeof ApiPrefetchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/speak': {
@@ -229,6 +249,7 @@ const rootRouteChildren: RootRouteChildren = {
   EvalRoute: EvalRoute,
   ApiChatRoute: ApiChatRoute,
   ApiEvalRoute: ApiEvalRoute,
+  ApiPrefetchRoute: ApiPrefetchRoute,
   ApiSpeakRoute: ApiSpeakRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
 }

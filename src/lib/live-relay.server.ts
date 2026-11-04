@@ -2,6 +2,7 @@ import process from "node:process";
 import { buildChunks } from "./portfolio";
 import { CHAT_SYSTEM } from "./prompt";
 import { retrieve } from "../server/rag.server";
+import { GUARDRAIL } from "./voice-logic";
 
 import {
   connectLive,
@@ -107,6 +108,8 @@ If the profile doesn't cover something, say so and suggest emailing daniyallko@g
 Read emails and links naturally (say "at" and "dot"). Don't read markdown or bullet symbols aloud.
 Backchannel policy: Use light listening sounds sparingly; never talk over the user.
 Interruption policy: When the user starts speaking, stop immediately, drop the rest of your answer and respond to what they just said.
+${GUARDRAIL}
+Latency masking: Before delegating to the backend, say a brief natural filler first, such as "Let me pull that up." or "Checking that project."
 Delegation policy:
 Backend tools: A portfolio search that returns grounded, detailed answers.
 Delegate to the backend when: The user asks for a detailed comparison or a detail the profile below does not clearly answer.
