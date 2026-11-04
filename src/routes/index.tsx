@@ -45,6 +45,7 @@ function useCoBrowse() {
     if (!targets.length) return;
     targets[0]!.scrollIntoView({ behavior: "smooth", block: "center" });
     targets.forEach((el) => el.classList.add("hl-pulse"));
+    document.documentElement.dataset["cobrowseHit"] = targets.map((el) => el.id || (el as HTMLElement).dataset["skill"] || "").join(",");
     const t = setTimeout(() => targets.forEach((el) => el.classList.remove("hl-pulse")), 3200);
     return () => clearTimeout(t);
   }, []);
