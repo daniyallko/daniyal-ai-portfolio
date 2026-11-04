@@ -58,6 +58,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   const turnsRef = useRef<Caption[]>([]); // full call transcript, persisted on hang-up
   const turnRef = useRef(0);
   const dropAssistantRef = useRef(false);
+  const pendingBargeRef = useRef<number | null>(null);
   const capStartPlayedRef = useRef(0);
   const prefetchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastPrefetchKey = useRef("");
@@ -92,18 +93,8 @@ function ThreadView({ threadId }: { threadId: string }) {
   const voice = useLiveVoice({
     onEvent: (ev: LiveEvent) => {
       if (ev.type === "app.barge_in") {
-        // Drop zombie tokens of the interrupted turn and keep only what was actually heard.
-        dropAssistantRef.current = true;
-        const played = Number(ev["playedMs"] ?? 0) - capStartPlayedRef.current;
-        updateCaptions((c) => {
-          const last = c[c.length - 1];
-          if (!last || last.role !== "assistant") return c;
-          return [...c.slice(0, -1), { ...last, text: truncateToPlayed(last.text, played), interrupted: true }];
-        });
-        setTimeout(() => {
-          const last = turnsRef.current[turnsRef.current.length - 1];
-          if (last?.role !== "user") dropAssistantRef.current = false; // false alarm
-        }, 1200);
+        // Audio is already flushed locally; confirm the interruption once the user's words arrive.
+        pendingBargeRef.current = Number(ev["playedMs"] ?? 0) - capStartPlayedRef.current;
         return;
       }
       const isIn = ev.type === "session.input_transcript.delta";
@@ -112,7 +103,16 @@ function ThreadView({ threadId }: { threadId: string }) {
       const delta = typeof ev["delta"] === "string" ? (ev["delta"] as string) : "";
       if (!delta) return;
       if (isIn) {
-        dropAssistantRef.current = false;
+        if (pendingBargeRef.current !== null) {
+          const played = pendingBargeRef.current;
+          pendingBargeRef.current = null;
+          dropAssistantRef.current = true; // zombie tokens of the interrupted turn are dropped
+          updateCaptions((c) => {
+            const l = c[c.length - 1];
+            if (!l || l.role !== "assistant") return c;
+            return [...c.slice(0, -1), { ...l, text: truncateToPlayed(l.text, played), interrupted: true }];
+          });
+        }
         const last = turnsRef.current[turnsRef.current.length - 1];
         if (!last || last.role !== "user") turnRef.current += 1;
         const turn = turnRef.current;
@@ -124,7 +124,11 @@ function ThreadView({ threadId }: { threadId: string }) {
         prefetch(turnsRef.current[turnsRef.current.length - 1]!.text);
         return;
       }
-      if (dropAssistantRef.current) return;
+      if (dropAssistantRef.current) {
+        const t = voice.telemetry.current;
+        if (t.vad === "silence" && t.silenceMs > 300) dropAssistantRef.current = false; // user finished: new turn
+        else return;
+      }
       const last = turnsRef.current[turnsRef.current.length - 1];
       if (!last || last.role !== "assistant") {
         capStartPlayedRef.current = voice.telemetry.current.playedMs;
@@ -154,7 +158,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   }, [voice.status, visitorId, threadId, qc]);
 
   const lastDebug = [...messages].reverse().find((m) => m.role === "assistant" && m.debug?.timingsMs)?.debug;
-  const startCall = () => { speech.stop(); turnsRef.current = []; setCaptions([]); turnRef.current = 0; dropAssistantRef.current = false; voice.start(); };
+  const startCall = () => { speech.stop(); turnsRef.current = []; setCaptions([]); turnRef.current = 0; dropAssistantRef.current = false; pendingBargeRef.current = null; voice.start(); };
 
   useEffect(() => {
     getThread({ data: { visitorId, threadId } }).then((t) => {

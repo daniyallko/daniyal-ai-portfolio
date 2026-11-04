@@ -1,7 +1,7 @@
 // AudioWorklet processors for the live voice call. Runs off the main thread.
 
 // Spectral-energy + zero-crossing-rate voice activity detector.
-// 128-sample frames (~2.7ms @48k); onset after 3 voiced frames (<10ms).
+// 128-sample frames (~2.7ms @48k); onset after 8 voiced frames (~21ms @48k).
 class VadProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -25,7 +25,7 @@ class VadProcessor extends AudioWorkletProcessor {
     if (!this.speaking) this.floor = this.floor * 0.995 + Math.min(rms, 0.05) * 0.005;
     const voiced = rms > Math.max(0.015, this.floor * 3) && zcr > 0.005 && zcr < 0.4;
     if (voiced) { this.run++; this.silentMs = 0; } else { this.run = 0; this.silentMs += frameMs; }
-    if (!this.speaking && this.run >= 3) {
+    if (!this.speaking && this.run >= 8) {
       this.speaking = true;
       this.port.postMessage({ type: "onset", detectMs: this.run * frameMs });
     }
