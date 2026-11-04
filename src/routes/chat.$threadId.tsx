@@ -59,6 +59,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   const turnRef = useRef(0);
   const dropAssistantRef = useRef(false);
   const pendingBargeRef = useRef<number | null>(null);
+  const [droppedPackets, setDroppedPackets] = useState(0);
   const capStartPlayedRef = useRef(0);
   const prefetchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastPrefetchKey = useRef("");
@@ -127,7 +128,7 @@ function ThreadView({ threadId }: { threadId: string }) {
       if (dropAssistantRef.current) {
         const t = voice.telemetry.current;
         if (t.vad === "silence" && t.silenceMs > 300) dropAssistantRef.current = false; // user finished: new turn
-        else return;
+        else { setDroppedPackets((n) => n + 1); return; }
       }
       const last = turnsRef.current[turnsRef.current.length - 1];
       if (!last || last.role !== "assistant") {
@@ -319,7 +320,7 @@ function ThreadView({ threadId }: { threadId: string }) {
 
         <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mx-auto w-full max-w-3xl px-6 pb-6">
           <audio ref={voice.audioRef} className="hidden" />
-          <TelemetryPanel telemetry={voice.telemetry} inCall={inCall} endpointMs={endpointMs} prefetch={prefetchLog} dispatches={dispatches} llmFirstTokenMs={(lastDebug?.timingsMs?.["firstToken"] as number | null | undefined) ?? null} ragCache={lastDebug?.cache ?? null} ttsTtfaMs={speech.ttfaMs} />
+          <TelemetryPanel telemetry={voice.telemetry} inCall={inCall} endpointMs={endpointMs} prefetch={prefetchLog} dispatches={dispatches} llmFirstTokenMs={(lastDebug?.timingsMs?.["firstToken"] as number | null | undefined) ?? null} ragCache={lastDebug?.cache ?? null} ragMs={lastDebug?.timingsMs ? (Number(lastDebug.timingsMs["embed"] ?? 0) + Number(lastDebug.timingsMs["retrieve"] ?? 0)) : null} ttsTtfaMs={speech.ttfaMs} ttsTtfbMs={speech.ttfbMs} droppedPackets={droppedPackets} />
           {dispatches.length > 0 && (
             <div className="mb-2 flex flex-wrap items-center gap-1 font-mono text-[11px]">
               <span className="text-muted-foreground">open in portfolio:</span>

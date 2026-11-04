@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Activity, ChevronDown } from "lucide-react";
 import type { VoiceTelemetry } from "@/hooks/use-live-voice";
-import { actionLabel, type UiAction } from "@/lib/voice-logic";
+import { actionHref, actionLabel, detectActions, type UiAction } from "@/lib/voice-logic";
 
 export type OrbState = "idle" | "listening" | "retrieving" | "thinking" | "speaking";
 
@@ -100,6 +100,95 @@ function Meter({ value, max }: { value: number; max: number }) {
   );
 }
 
+type Check = { name: string; status: "idle" | "running" | "pass" | "fail"; detail: string };
+const CHECKS = ["AudioWorklet registration", "Mic AEC constraints", "Speculative RAG cache (<50ms)", "Turn-ID barge-in cancellation", "Generative UI scroll dispatch"];
+
+const withTimeout = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<T>((_, r) => setTimeout(() => r(new Error(`timed out after ${ms}ms`)), ms))]);
+
+async function checkWorklet(): Promise<string> {
+  const ctx = new AudioContext();
+  try {
+    await ctx.audioWorklet.addModule("/voice-worklets.js");
+    new AudioWorkletNode(ctx, "vad-processor");
+    new AudioWorkletNode(ctx, "ring-player");
+    return `vad-processor + ring-player registered @ ${ctx.sampleRate}Hz`;
+  } finally { void ctx.close(); }
+}
+
+async function checkMic(): Promise<string> {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 24000 } });
+  try {
+    const st = stream.getAudioTracks()[0]?.getSettings() ?? {};
+    if (st.echoCancellation !== true) throw new Error(`echoCancellation=${String(st.echoCancellation)}`);
+    return `AEC=${st.echoCancellation} NS=${String(st.noiseSuppression)} AGC=${String(st.autoGainControl)} ch=${st.channelCount ?? "?"} sr=${st.sampleRate ?? "?"}`;
+  } finally { stream.getTracks().forEach((t) => t.stop()); }
+}
+
+async function checkCache(): Promise<string> {
+  const query = `system check ${Date.now()} does he know python fastapi`;
+  const call = async () => {
+    const r = await fetch("/api/prefetch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query }) });
+    if (!r.ok) throw new Error(`prefetch HTTP ${r.status}`);
+    return (await r.json()) as { cache: string; ms: number };
+  };
+  const cold = await call();
+  const warm = await call();
+  if (warm.cache !== "hit") throw new Error(`second lookup was ${warm.cache}`);
+  if (warm.ms >= 50) throw new Error(`warm lookup ${warm.ms}ms`);
+  return `cold ${cold.cache} ${cold.ms}ms → warm hit ${warm.ms}ms`;
+}
+
+async function checkBargeIn(): Promise<string> {
+  const ctx = new AudioContext();
+  try {
+    await ctx.audioWorklet.addModule("/voice-worklets.js");
+    await ctx.resume();
+    const osc = ctx.createOscillator();
+    const node = new AudioWorkletNode(ctx, "ring-player", { outputChannelCount: [1] });
+    const sink = ctx.createGain();
+    sink.gain.value = 0; // silent test
+    osc.connect(node).connect(sink).connect(ctx.destination);
+    osc.start();
+    let speaking = false, cutAt = 0;
+    const result = new Promise<string>((resolve) => {
+      node.port.onmessage = ({ data }) => {
+        if (data.type !== "level") return;
+        if (!speaking && data.rms > 0.05) {
+          speaking = true;
+          cutAt = performance.now();
+          node.port.postMessage({ type: "flush" });
+          node.port.postMessage({ type: "duck", on: true });
+        } else if (speaking && data.rms < 0.001) resolve(`playback silenced ${Math.round(performance.now() - cutAt)}ms after interrupt`);
+      };
+    });
+    const msg = await withTimeout(result, 3000);
+    const ms = Number(msg.match(/(\d+)ms/)?.[1] ?? 999);
+    if (ms > 60) throw new Error(msg);
+    return msg;
+  } finally { void ctx.close(); }
+}
+
+async function checkDispatch(): Promise<string> {
+  const action = detectActions("Tell me about AI BotKit")[0];
+  if (!action) throw new Error("no action detected");
+  const href = actionHref(action);
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;left:-9999px;width:1200px;height:900px;";
+  frame.src = href;
+  document.body.appendChild(frame);
+  try {
+    const t0 = performance.now();
+    while (performance.now() - t0 < 8000) {
+      await new Promise((r) => setTimeout(r, 100));
+      const el = frame.contentDocument?.querySelector(".hl-pulse");
+      if (el) return `${actionLabel(action)} → #${el.id} highlighted in ${Math.round(performance.now() - t0)}ms`;
+    }
+    throw new Error(`${href} did not highlight a target`);
+  } finally { frame.remove(); }
+}
+
+const RUNNERS = [checkWorklet, checkMic, checkCache, checkBargeIn, checkDispatch];
+
 export function TelemetryPanel(props: {
   telemetry: MutableRefObject<VoiceTelemetry>;
   inCall: boolean;
@@ -108,68 +197,110 @@ export function TelemetryPanel(props: {
   dispatches: Dispatch[];
   llmFirstTokenMs: number | null;
   ragCache: string | null;
+  ragMs: number | null;
   ttsTtfaMs: number | null;
+  ttsTtfbMs: number | null;
+  droppedPackets: number;
 }) {
   const [open, setOpen] = useState(false);
   const [, tick] = useState(0);
+  const [checks, setChecks] = useState<Check[]>(CHECKS.map((name) => ({ name, status: "idle", detail: "" })));
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") { e.preventDefault(); setOpen((o) => !o); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const id = setInterval(() => tick((n) => n + 1), 100);
     return () => clearInterval(id);
   }, [open]);
+  const running = checks.some((c) => c.status === "running");
+  const runAll = async () => {
+    for (let i = 0; i < RUNNERS.length; i++) {
+      setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "running", detail: "" } : c)));
+      try {
+        const detail = await withTimeout(RUNNERS[i]!(), 12000);
+        setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "pass", detail } : c)));
+      } catch (e) {
+        setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "fail", detail: (e as Error).message } : c)));
+      }
+    }
+  };
   const t = props.telemetry.current;
   const remaining = t.connectedAt && props.inCall ? Math.max(0, t.maxMs - (Date.now() - t.connectedAt)) : null;
-  const idleLeft = props.inCall ? Math.max(0, t.idleMs - (Date.now() - t.lastActivity)) : null;
   const fmt = (ms: number | null) => (ms === null ? "—" : `${Math.round(ms)}ms`);
   const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
-  const hits = props.prefetch.filter((p) => p.cache === "hit").length;
+  const lastPrefetch = props.prefetch[props.prefetch.length - 1];
+  const ragLabel = lastPrefetch ? (lastPrefetch.cache === "hit" ? "SPECULATIVE CACHE HIT" : "HYBRID DB QUERY") : props.ragCache ? (props.ragCache === "hit" ? "SPECULATIVE CACHE HIT" : "HYBRID DB QUERY") : "—";
+  const ragMs = lastPrefetch ? lastPrefetch.ms : props.ragMs;
+  const ttfaColor = t.ttfaMs === null ? "text-muted-foreground" : t.ttfaMs < 500 ? "text-primary" : t.ttfaMs < 800 ? "text-amber-400" : "text-destructive";
+  const mode = props.endpointMs <= 400 ? `Fast ${props.endpointMs}ms` : props.endpointMs >= 1100 ? `Extended ${props.endpointMs}ms` : `Normal ${props.endpointMs}ms`;
+  const fillPct = Math.min(100, (t.bufferMs / 1000) * 100);
+  const lastTool = props.dispatches[props.dispatches.length - 1];
+  const { at: _at, ...toolPayload } = lastTool ?? { at: 0 };
   return (
-    <section className="mb-2 border border-border bg-card font-mono text-[11px]">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="telemetry-body" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-muted-foreground hover:text-foreground">
-        <Activity className="h-3.5 w-3.5 text-primary" />
-        <span>telemetry</span>
-        <span className="ml-auto flex gap-3">
-          <span>turn #{t.turnId}</span>
-          {remaining !== null && <span className={remaining < 60000 ? "text-destructive" : ""}>⏱ {mmss(remaining)}</span>}
-        </span>
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+    <>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="telemetry-hud" title="Telemetry (Ctrl+Shift+D)" className="fixed bottom-24 right-4 z-30 flex items-center gap-1.5 border border-primary bg-background px-2.5 py-1 font-mono text-[11px] text-primary hover:bg-primary hover:text-primary-foreground">
+        ⚡ Telemetry {remaining !== null && <span className="tabular-nums">· {mmss(remaining)}</span>}
       </button>
       {open && (
-        <div id="telemetry-body" className="grid gap-px border-t border-border bg-border md:grid-cols-3">
-          <dl className="bg-card p-3">
-            <p className="mb-1 text-primary">audio</p>
-            <Row k="mic rms" v={t.micRms.toFixed(3)} />
-            <Meter value={t.micRms} max={0.2} />
-            <Row k="vad" v={t.vad === "speech" ? "speech onset" : `silence ${t.silenceMs}ms`} />
-            <Row k="onset detect" v={fmt(t.onsetDetectMs)} />
-            <Row k="worklet buffer" v={t.worklet ? `${t.bufferMs.toFixed(1)}ms` : "fallback"} warn={!t.worklet && props.inCall} />
-            <Meter value={t.bufferMs} max={100} />
-            <Row k="out rms" v={t.outRms.toFixed(3)} />
-            <Row k="underruns" v={String(t.underruns)} />
-          </dl>
-          <dl className="bg-card p-3">
-            <p className="mb-1 text-primary">turns & latency</p>
-            <Row k="session" v={t.sessionId.slice(0, 8)} />
-            <Row k="turn_id" v={String(t.turnId)} />
-            <Row k="barge-ins" v={`${t.bargeIns}${t.lastBargeCutMs !== null ? ` · cut ${t.lastBargeCutMs}ms` : ""}`} />
-            <Row k="endpoint (pred.)" v={`${props.endpointMs}ms`} />
-            <Row k="voice TTFA" v={fmt(t.ttfaMs)} />
-            <Row k="LLM first token" v={fmt(props.llmFirstTokenMs)} />
-            <Row k="read-aloud TTFA" v={fmt(props.ttsTtfaMs)} />
-            <Row k="RAG cache (text)" v={props.ragCache ?? "—"} />
-          </dl>
-          <dl className="bg-card p-3">
-            <p className="mb-1 text-primary">prefetch & tools</p>
-            <Row k="prefetch hit/total" v={`${hits}/${props.prefetch.length}`} />
-            {props.prefetch.slice(-2).map((p, i) => <Row key={i} k={p.query.slice(0, 22)} v={`${p.cache} ${p.ms}ms`} />)}
-            <Row k="idle cutoff" v={idleLeft === null ? "—" : `${Math.ceil(idleLeft / 1000)}s`} warn={idleLeft !== null && idleLeft < 5000} />
-            <p className="mt-2 text-muted-foreground">tool dispatches</p>
-            {props.dispatches.length === 0 ? <p className="text-muted-foreground">none</p> : props.dispatches.slice(-4).map((d) => (
-              <p key={d.at + d.href} className="truncate"><span className="text-primary">{d.source}›</span> {actionLabel(d.action)}</p>
-            ))}
-          </dl>
-        </div>
+        <section id="telemetry-hud" role="dialog" aria-label="Voice and RAG telemetry" className="fixed bottom-32 right-4 z-30 max-h-[70vh] w-[min(560px,calc(100vw-2rem))] overflow-y-auto border border-border bg-card font-mono text-[11px] shadow-2xl">
+          <header className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <Activity className="h-3.5 w-3.5 text-primary" />
+            <span className="text-foreground">voice & rag telemetry</span>
+            <span className="ml-auto text-muted-foreground">ctrl+shift+d</span>
+            <button type="button" onClick={() => setOpen(false)} aria-label="Close telemetry" className="text-muted-foreground hover:text-foreground"><ChevronDown className="h-3.5 w-3.5" /></button>
+          </header>
+          <div className="grid gap-px bg-border sm:grid-cols-2">
+            <dl className="bg-card p-3">
+              <p className="mb-1 text-primary">latency breakdown</p>
+              <Row k="VAD detection" v={fmt(t.onsetDetectMs)} />
+              <Row k="RAG retrieval" v={fmt(ragMs)} />
+              <p className={`py-1 text-right ${ragLabel === "SPECULATIVE CACHE HIT" ? "text-primary" : "text-muted-foreground"}`}>{ragLabel}</p>
+              <Row k="LLM TTFT" v={fmt(props.llmFirstTokenMs)} />
+              <Row k="TTS TTFB" v={fmt(props.ttsTtfbMs)} />
+              <Row k="read-aloud TTFA" v={fmt(props.ttsTtfaMs)} />
+              <div className="flex justify-between gap-3 py-1">
+                <dt className="text-muted-foreground">voice-to-voice TTFA</dt>
+                <dd className={`tabular-nums ${ttfaColor}`}>{fmt(t.ttfaMs)}</dd>
+              </div>
+            </dl>
+            <dl className="bg-card p-3">
+              <p className="mb-1 text-primary">pipeline state</p>
+              <Row k="turn_id" v={String(t.turnId)} />
+              <Row k="dropped stale packets" v={String(props.droppedPackets)} />
+              <Row k="barge-ins" v={`${t.bargeIns}${t.lastBargeCutMs !== null ? ` · cut ${t.lastBargeCutMs}ms` : ""}`} />
+              <Row k="AudioWorklet" v={t.worklet ? "Active" : props.inCall ? "Fallback" : "—"} warn={props.inCall && !t.worklet} />
+              <Row k="ring buffer" v={`${fillPct.toFixed(1)}% (${t.bufferMs.toFixed(1)}ms)`} />
+              <Meter value={fillPct} max={100} />
+              <Row k="underruns" v={String(t.underruns)} warn={t.underruns > 0} />
+              <Row k="mic rms · vad" v={`${t.micRms.toFixed(3)} · ${t.vad}`} />
+              <Row k="endpointing" v={mode} />
+            </dl>
+          </div>
+          <div className="border-t border-border p-3">
+            <p className="mb-1 text-primary">last generative UI tool call</p>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all text-muted-foreground">{lastTool ? JSON.stringify(toolPayload, null, 1) : "none"}</pre>
+          </div>
+          <div className="border-t border-border p-3">
+            <div className="mb-2 flex items-center">
+              <p className="text-primary">system check</p>
+              <button type="button" onClick={runAll} disabled={running} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run System Check"}</button>
+            </div>
+            <ul className="space-y-1">
+              {checks.map((c) => (
+                <li key={c.name} className="grid grid-cols-[48px_1fr] gap-2">
+                  <span className={`border px-1 text-center ${c.status === "pass" ? "border-primary bg-primary text-primary-foreground" : c.status === "fail" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border text-muted-foreground"}`}>{c.status === "pass" ? "PASS" : c.status === "fail" ? "FAIL" : c.status === "running" ? "…" : "—"}</span>
+                  <span><span className="text-foreground">{c.name}</span>{c.detail && <span className="block text-muted-foreground">{c.detail}</span>}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       )}
-    </section>
+    </>
   );
 }

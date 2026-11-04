@@ -57,7 +57,7 @@ export async function retrieve(query: string, topK = 5): Promise<{ sources: Sour
   if (hit) {
     try {
       const r = await hit.value;
-      return { sources: r.sources, debug: { ...r.debug, query, cache: "hit" } };
+      return { sources: r.sources, debug: { ...r.debug, query, cache: "hit", timingsMs: { embed: 0, retrieve: Date.now() - now } } };
     } catch { warm.delete(key); }
   }
   const value = retrieveUncached(query, topK);
