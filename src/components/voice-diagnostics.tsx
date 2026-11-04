@@ -434,6 +434,24 @@ export function TelemetryPanel(props: {
               </div>
             ) : <p className="text-muted-foreground">ask a question to populate</p>}
           </div>
+          {(() => {
+            const raw = props.bridge?.raw ?? "";
+            const d = raw ? detectLanguageAndRegister(raw) : null;
+            const n = raw ? normalizeCrossLingualRagQuery(raw) : null;
+            const ep = getMultilingualEndpointTimeoutMs(raw);
+            return (
+              <div className="border-t border-border p-3">
+                <p className="mb-1 text-primary">multilingual voice engine</p>
+                <dl>
+                  <Row k="active voice" v={`${props.persona.name} · ${props.persona.ttsVoice} · ${props.persona.ttsModel.split("/")[1]!}`} />
+                  <Row k="detected language" v={d ? `${d.langName} (${d.langCode}, ${d.script}, Code-Switched: ${d.isCodeSwitched})` : "—"} />
+                  <Row k="rag bridge" v={n ? `${n.englishSearchQuery} (${n.normalizationTimeMs}ms)` : "—"} />
+                  <Row k="chunker last flush" v={props.delimiter ? `"${props.delimiter}"` : "none"} />
+                  <Row k="endpointing" v={raw ? ep.mode : "—"} />
+                </dl>
+              </div>
+            );
+          })()}
           <div className="border-t border-border p-3">
             <p className="mb-1 text-primary">last generative UI tool call</p>
             <pre className="overflow-x-auto whitespace-pre-wrap break-all text-muted-foreground">{lastTool ? JSON.stringify(toolPayload, null, 1) : "none"}</pre>
@@ -448,7 +466,7 @@ export function TelemetryPanel(props: {
           <div className="border-t border-border p-3">
             <div className="mb-2 flex items-center">
               <p className="text-primary">multilingual & voice check</p>
-              <button type="button" onClick={runMl} disabled={running} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run Multilingual Check"}</button>
+              <button type="button" onClick={runMl} disabled={running} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run Multilingual & Voice Check"}</button>
             </div>
             <Checklist checks={mlChecks} />
           </div>
