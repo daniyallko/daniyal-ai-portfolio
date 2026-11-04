@@ -13,9 +13,9 @@ export const Route = createFileRoute("/api/transcribe")({
         if (file.size > MAX_BYTES) return Response.json({ error: "Recording is too long" }, { status: 413 });
         try {
           const named = file;
-          const res = await transcribeAudio({ model: "openai/gpt-transcribe", file: named, language: "en" });
-          const text = (res as unknown as { text?: string }).text?.trim() ?? "";
-          return Response.json({ text });
+          const res = await transcribeAudio({ model: "openai/gpt-transcribe", file: named });
+          const out = res as unknown as { text?: string; language?: string };
+          return Response.json({ text: out.text?.trim() ?? "", language: out.language ?? null });
         } catch (e) {
           console.error(e);
           return Response.json({ error: e instanceof GatewayError ? e.message : "Transcription failed" }, { status: 502 });

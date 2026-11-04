@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { generateSpeech, GatewayError } from "@lovable.dev/ai-gateway";
-import { prepareForSpeech, SPEAK_MODEL, SPEAK_VOICE } from "@/lib/speech";
+import { prepareForSpeech, SPEAK_MODEL } from "@/lib/speech";
+import { VOICE_PERSONAS, getPersona } from "@/config/voicePersonas";
+import { LANGUAGES, detectLanguage, isLangCode } from "@/lib/language";
 
 // Repeated clicks on the same answer shouldn't re-bill the speech model.
 const TTL_MS = 10 * 60 * 1000;
@@ -23,13 +25,17 @@ export const Route = createFileRoute("/api/speak")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const body = (await request.json().catch(() => null)) as { text?: unknown } | null;
+        const body = (await request.json().catch(() => null)) as { text?: unknown; voice?: unknown; lang?: unknown } | null;
         const text = prepareForSpeech(typeof body?.text === "string" ? body.text : "");
         if (!text) return Response.json({ error: "Nothing to read aloud" }, { status: 400 });
 
-        const hit = cache.get(text);
+        // Bind the persona's voice and the language so the synthesizer uses native pronunciation.
+        const voiceName = VOICE_PERSONAS.some((p) => p.ttsVoice === body?.voice) ? (body!.voice as string) : getPersona(null).ttsVoice;
+        const lang = isLangCode(body?.lang) ? body.lang : detectLanguage(text).code;
+        const key = `${voiceName}|${lang}|${text}`;
+        const hit = cache.get(key);
         if (hit && Date.now() - hit.at < TTL_MS) {
-          return new Response(hit.audio, { headers: { "content-type": "audio/wav", "cache-control": "no-store" } });
+          return new Response(hit.audio, { headers: { "content-type": "audio/wav", "cache-control": "no-store", "x-voice": voiceName, "x-lang": lang } });
         }
 
         try {
@@ -39,15 +45,15 @@ export const Route = createFileRoute("/api/speak")({
               contents: [{ role: "user", parts: [{ text }] }],
               generationConfig: {
                 responseModalities: ["AUDIO"],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: SPEAK_VOICE } } },
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } }, languageCode: LANGUAGES[lang].bcp47 },
               },
             },
             { signal: request.signal },
           );
           const audio = await res.blob().then((b) => b.arrayBuffer());
-          remember(text, audio);
+          remember(key, audio);
           return new Response(audio, {
-            headers: { "content-type": res.contentType || "audio/wav", "cache-control": "no-store" },
+            headers: { "content-type": res.contentType || "audio/wav", "cache-control": "no-store", "x-voice": voiceName, "x-lang": lang },
           });
         } catch (e) {
           if (request.signal.aborted || (e as Error)?.name === "AbortError") return new Response(null, { status: 499 });

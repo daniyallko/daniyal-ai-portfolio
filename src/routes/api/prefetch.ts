@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/prefetch")({
         const t0 = Date.now();
         try {
           const r = await retrieve(parsed.data.query);
-          return Response.json({ cache: r.debug.cache ?? "miss", ms: Date.now() - t0, sources: r.sources.length });
+          return Response.json({ cache: r.debug.cache ?? "miss", ms: Date.now() - t0, sources: r.sources.length, ids: r.sources.map((s) => s.id), titles: r.sources.map((s) => s.title), bridge: r.debug.bridge });
         } catch (e) {
           console.error(e);
           return Response.json({ error: "Prefetch failed" }, { status: 502 });

@@ -2,45 +2,36 @@
 // prefetch cache keys and co-browsing action detection.
 import { projects, skills } from "@/lib/portfolio";
 
-const TRAILING = new Set([
-  "and", "because", "like", "with", "uh", "um", "er", "so", "but", "or", "to", "of", "for",
-  "the", "a", "an", "in", "on", "at", "about", "if", "that", "which", "then", "his", "my",
-]);
-const QUESTION_START = /^(what|who|where|when|why|how|is|are|does|did|do|can|could|has|have|tell|show|list|describe)\b/;
+import { TRAILING_MULTI, polyglotFirstClause } from "@/lib/language";
 
-/** Silence (ms) to wait before treating the trailing transcript as a finished turn. */
+const QUESTION_START = /^(what|who|where|when|why|how|is|are|does|did|do|can|could|has|have|tell|show|list|describe|qué|cómo|cuál|quel|quels|comment|was|wie|welche|o que|como|quais|kya|kaise|kaun|क्या|कैसे|कौन)(?![\p{L}])/u;
+
+/** Silence (ms) to wait before treating the trailing transcript as a finished turn (multilingual). */
 export function endpointSilenceMs(transcript: string): number {
   const s = transcript.trim().toLowerCase();
   if (!s) return 700;
-  if (/(\.\.\.|…|,|-|—)$/.test(s)) return 1100;
-  const last = s.replace(/[^a-z' ]/g, " ").trim().split(/\s+/).pop() ?? "";
-  if (TRAILING.has(last)) return 1100;
-  if (/[.?!]["')]?$/.test(s)) return 350;
+  if (/(\.\.\.|…|,|،|、|-|—)$/.test(s)) return 1100;
+  const last = s.replace(/[^\p{L}\p{M}' ]/gu, " ").trim().split(/\s+/).pop() ?? "";
+  if (TRAILING_MULTI.has(last)) return 1100;
+  if (/[.?!।॥。？！؟]["')]?$/.test(s)) return 350;
   if (QUESTION_START.test(s) && s.split(/\s+/).length >= 4) return 400;
   return 700;
 }
 
 /**
- * Split text so the first chunk is a short clause (5–8 words ending at punctuation)
+ * Split text so the first chunk is a short clause (5–8 words ending at punctuation in any script)
  * that can be synthesized immediately; the rest keeps full sentences for prosody.
  */
 export function firstClauseSplit(text: string, min = 5, max = 8): [string, string] {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= max + 4) return [words.join(" "), ""];
-  for (let i = min - 1; i < Math.min(max, words.length); i++) {
-    if (/[,;:.!?—–-]$/.test(words[i]!)) return [words.slice(0, i + 1).join(" "), words.slice(i + 1).join(" ")];
-  }
-  // No clause boundary in range: cut at the first sentence end if it's short, else at max words.
-  const end = words.findIndex((w, i) => i >= min - 1 && /[.!?]$/.test(w));
-  const cut = end >= 0 && end < 16 ? end + 1 : max;
-  return [words.slice(0, cut).join(" "), words.slice(cut).join(" ")];
+  const r = polyglotFirstClause(text, min, max);
+  return [r.first, r.rest];
 }
 
 const STOP = new Set(["the", "a", "an", "is", "are", "does", "did", "do", "has", "have", "he", "his", "him", "daniyal", "what", "tell", "me", "about", "of", "in", "on", "and", "to", "can", "you", "with", "for", "any", "uh", "um", "please"]);
 
 /** Order-insensitive cache key for a spoken/typed query. */
 export function normalizeQueryKey(q: string): string {
-  const toks = q.toLowerCase().replace(/[^a-z0-9+#. ]/g, " ").split(/\s+/).map((t) => t.replace(/\.$/, "")).filter((t) => t && !STOP.has(t));
+  const toks = q.toLowerCase().replace(/[^\p{L}\p{M}\p{N}+#. ]/gu, " ").split(/\s+/).map((t) => t.replace(/\.$/, "")).filter((t) => t && !STOP.has(t));
   return [...new Set(toks)].sort().join(" ");
 }
 

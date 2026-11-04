@@ -77,7 +77,7 @@ export function liveVoiceDev(): Plugin {
             const relay = (await server.ssrLoadModule(
               "/src/lib/live-relay.server.ts",
             )) as typeof import("./src/lib/live-relay.server");
-            const config = relay.getLiveConfig();
+            const config = relay.getLiveConfig(request.url);
             const rejection = relay.validateLiveUpgrade(upgradeRequest(request), { allowMissingOrigin: true });
             if (rejection) return rejectUpgrade(socket, rejection.status);
             if (socket.destroyed) return;

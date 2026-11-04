@@ -1,6 +1,7 @@
 import { generateEmbeddings } from "@lovable.dev/ai-gateway";
 import { buildChunks, type Chunk } from "@/lib/portfolio";
 import { normalizeQueryKey } from "@/lib/voice-logic";
+import { bridgeQuery } from "@/lib/language";
 import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
 
 const EMBED_MODEL = "google/gemini-embedding-2";
@@ -42,6 +43,7 @@ export type Source = { n: number; id: string; section: string; title: string; te
 export type RetrievalDebug = {
   query: string;
   timingsMs: { embed: number; retrieve: number };
+  bridge?: { raw: string; tokens: string[]; normalized: string; ms: number };
   candidates: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
 };
 
@@ -49,7 +51,11 @@ export type RetrievalDebug = {
 const CACHE_TTL = 5 * 60_000;
 const warm = new Map<string, { at: number; value: Promise<{ sources: Source[]; debug: RetrievalDebug }> }>();
 
-export async function retrieve(query: string, topK = 5): Promise<{ sources: Source[]; debug: RetrievalDebug & { cache?: "hit" | "miss" } }> {
+export async function retrieve(rawQuery: string, topK = 5): Promise<{ sources: Source[]; debug: RetrievalDebug & { cache?: "hit" | "miss" } }> {
+  // Cross-lingual bridge: non-English queries gain canonical English search terms.
+  const b = bridgeQuery(rawQuery);
+  const query = b.normalized;
+  const bridge = { raw: rawQuery, tokens: b.tokens, normalized: b.normalized, ms: b.ms };
   const key = `${topK}:${normalizeQueryKey(query)}`;
   const now = Date.now();
   for (const [k, v] of warm) if (now - v.at > CACHE_TTL) warm.delete(k);
@@ -57,7 +63,7 @@ export async function retrieve(query: string, topK = 5): Promise<{ sources: Sour
   if (hit) {
     try {
       const r = await hit.value;
-      return { sources: r.sources, debug: { ...r.debug, query, cache: "hit", timingsMs: { embed: 0, retrieve: Date.now() - now } } };
+      return { sources: r.sources, debug: { ...r.debug, query, bridge, cache: "hit", timingsMs: { embed: 0, retrieve: Date.now() - now } } };
     } catch { warm.delete(key); }
   }
   const value = retrieveUncached(query, topK);
@@ -65,7 +71,7 @@ export async function retrieve(query: string, topK = 5): Promise<{ sources: Sour
   while (warm.size > 100) { const k = warm.keys().next().value; if (k === undefined) break; warm.delete(k); }
   try {
     const r = await value;
-    return { sources: r.sources, debug: { ...r.debug, cache: "miss" } };
+    return { sources: r.sources, debug: { ...r.debug, bridge, cache: "miss" } };
   } catch (e) { warm.delete(key); throw e; }
 }
 
