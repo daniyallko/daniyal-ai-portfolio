@@ -178,10 +178,12 @@ async function checkDispatch(): Promise<string> {
   document.body.appendChild(frame);
   try {
     const t0 = performance.now();
-    while (performance.now() - t0 < 8000) {
+    // Poll for a persistent marker set by the portfolio page (the pulse class is removed after ~3s).
+    while (performance.now() - t0 < 18000) {
       await new Promise((r) => setTimeout(r, 100));
-      const el = frame.contentDocument?.querySelector(".hl-pulse");
-      if (el) return `${actionLabel(action)} → #${el.id} highlighted in ${Math.round(performance.now() - t0)}ms`;
+      let hit: string | undefined;
+      try { hit = frame.contentDocument?.documentElement.dataset["cobrowseHit"]; } catch { throw new Error("portfolio frame not readable"); }
+      if (hit) return `${actionLabel(action)} → #${hit} highlighted in ${Math.round(performance.now() - t0)}ms`;
     }
     throw new Error(`${href} did not highlight a target`);
   } finally { frame.remove(); }
@@ -222,7 +224,7 @@ export function TelemetryPanel(props: {
     for (let i = 0; i < RUNNERS.length; i++) {
       setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "running", detail: "" } : c)));
       try {
-        const detail = await withTimeout(RUNNERS[i]!(), 12000);
+        const detail = await withTimeout(RUNNERS[i]!(), 20000);
         setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "pass", detail } : c)));
       } catch (e) {
         setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "fail", detail: (e as Error).message } : c)));
