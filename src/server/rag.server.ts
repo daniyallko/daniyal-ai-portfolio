@@ -1,5 +1,6 @@
 import { generateEmbeddings } from "@lovable.dev/ai-gateway";
 import { buildChunks, type Chunk } from "@/lib/portfolio";
+import { normalizeQueryKey } from "@/lib/voice-logic";
 import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
 
 const EMBED_MODEL = "google/gemini-embedding-2";
@@ -44,7 +45,31 @@ export type RetrievalDebug = {
   candidates: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
 };
 
-export async function retrieve(query: string, topK = 5): Promise<{ sources: Source[]; debug: RetrievalDebug }> {
+// Warm in-memory cache keyed by normalized query tokens (speculative prefetch + repeat questions).
+const CACHE_TTL = 5 * 60_000;
+const warm = new Map<string, { at: number; value: Promise<{ sources: Source[]; debug: RetrievalDebug }> }>();
+
+export async function retrieve(query: string, topK = 5): Promise<{ sources: Source[]; debug: RetrievalDebug & { cache?: "hit" | "miss" } }> {
+  const key = `${topK}:${normalizeQueryKey(query)}`;
+  const now = Date.now();
+  for (const [k, v] of warm) if (now - v.at > CACHE_TTL) warm.delete(k);
+  const hit = warm.get(key);
+  if (hit) {
+    try {
+      const r = await hit.value;
+      return { sources: r.sources, debug: { ...r.debug, query, cache: "hit" } };
+    } catch { warm.delete(key); }
+  }
+  const value = retrieveUncached(query, topK);
+  warm.set(key, { at: now, value });
+  while (warm.size > 100) { const k = warm.keys().next().value; if (k === undefined) break; warm.delete(k); }
+  try {
+    const r = await value;
+    return { sources: r.sources, debug: { ...r.debug, cache: "miss" } };
+  } catch (e) { warm.delete(key); throw e; }
+}
+
+async function retrieveUncached(query: string, topK: number): Promise<{ sources: Source[]; debug: RetrievalDebug }> {
   const chunks = buildChunks();
   const t0 = Date.now();
   const [vecMap, [qv]] = await Promise.all([chunkEmbeddings(chunks), embed([query])]);
