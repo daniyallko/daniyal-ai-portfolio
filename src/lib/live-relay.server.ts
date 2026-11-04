@@ -3,6 +3,8 @@ import { buildChunks } from "./portfolio";
 import { CHAT_SYSTEM } from "./prompt";
 import { retrieve } from "../server/rag.server";
 import { GUARDRAIL } from "./voice-logic";
+import { getPersona, type VoicePersona } from "../config/voicePersonas";
+import { LANGUAGES, LANGUAGE_RULE, fillerFor, isLangCode, type LangCode } from "./language";
 
 import {
   connectLive,
@@ -20,6 +22,8 @@ export type LiveConfig = {
   liveModel: LiveModel;
   backendModel: ResponsesRequest["model"];
   openingInstructions?: string;
+  persona: VoicePersona;
+  lang: LangCode | null;
 };
 
 // Fill the literal model slugs from co-loaded knowledge before typechecking.
@@ -49,12 +53,18 @@ type ProviderEvent = LiveEvent<LiveConfig["liveModel"]>;
 type DelegationEvent = Extract<ProviderEvent, { type: "session.delegation.created" }>;
 type VoiceSession = Awaited<ReturnType<typeof connectLive>>;
 
-export function getLiveConfig(): LiveConfig {
+export function getLiveConfig(url?: string): LiveConfig {
+  const params = new URL(url ?? "/", "http://local").searchParams;
+  const persona = getPersona(params.get("voice"));
+  const langParam = params.get("lang");
+  const lang = isLangCode(langParam) ? langParam : null;
   const config: LiveConfig = {
     ...liveSettings,
+    persona,
+    lang,
     key: process.env["LOVABLE_API_KEY"] ?? "",
     openingInstructions:
-      "In English, greet the caller in one short sentence as Daniyal's portfolio voice assistant, then ask what they'd like to know about his experience or projects. Then listen.",
+      `In ${lang ? LANGUAGES[lang].name : "English"}, greet the caller in one short sentence as Daniyal's portfolio voice assistant, then ask what they'd like to know about his experience or projects. Then listen.`,
   };
   if ([config.key, config.liveModel, config.backendModel].some((value) => !value)) {
     throw new Error("Missing Live relay configuration");
@@ -89,7 +99,7 @@ function workerSocket(socket: WorkerSocket): LiveSocket {
 export function handleLiveRequest(request: Request): Response {
   const waitUntil = (request as Request & Partial<LiveExecutionContext>).waitUntil;
   if (!waitUntil) return new Response("Live runtime unavailable", { status: 503 });
-  const config = getLiveConfig();
+  const config = getLiveConfig(request.url);
   const rejected = validateLiveUpgrade(request);
   if (rejected) return rejected;
   const pair = new WebSocketPair();
@@ -99,17 +109,22 @@ export function handleLiveRequest(request: Request): Response {
   return new Response(null, response);
 }
 
-function conversationInstructions() {
+function conversationInstructions(config: LiveConfig) {
+  const female = config.persona.gender === "female";
+  const fillers = (["en", "hi", "es", "fr", "de"] as const).map((l) => `${LANGUAGES[l].name}: "${fillerFor(l, female)}"`).join("; ");
   const profile = buildChunks().map((c) => `- (${c.section}) ${c.title}: ${c.text}`).join("\n");
   return `You are the voice assistant on Mohd Daniyal's portfolio, talking with recruiters and hiring managers.
-Speak in English. Be warm, confident and brief: one to three short sentences per turn, then let them talk.
+${config.lang ? `Always speak ${LANGUAGES[config.lang].name}.` : "Detect the language the user speaks (including Hinglish and other code-switched mixes) and answer in that same language and register; start in English."}
+You speak as the "${config.persona.name}" persona (${config.persona.tagline}).
+${LANGUAGE_RULE}
+Be warm, confident and brief: one to three short sentences per turn, then let them talk.
 Refer to him as Daniyal. Use only the PROFILE below. Never invent facts, numbers, dates or employers.
 If the profile doesn't cover something, say so and suggest emailing daniyallko@gmail.com.
 Read emails and links naturally (say "at" and "dot"). Don't read markdown or bullet symbols aloud.
 Backchannel policy: Use light listening sounds sparingly; never talk over the user.
 Interruption policy: When the user starts speaking, stop immediately, drop the rest of your answer and respond to what they just said.
 ${GUARDRAIL}
-Latency masking: Before delegating to the backend, say a brief natural filler first, such as "Let me pull that up." or "Checking that project."
+Latency masking: Before delegating to the backend, say a brief natural filler first, in the language the user just used, never English for a non-English speaker. Examples: ${fillers}.
 Delegation policy:
 Backend tools: A portfolio search that returns grounded, detailed answers.
 Delegate to the backend when: The user asks for a detailed comparison or a detail the profile below does not clearly answer.
@@ -134,7 +149,7 @@ async function answerQuestion(
     {
       model: config.backendModel,
       input: [...messages, { role: "user", content: `SOURCES:\n${ctx}\n\nAnswer the latest user question for a spoken reply.` }],
-      instructions: CHAT_SYSTEM + "\nThis answer will be spoken aloud: no markdown, no citation numbers, at most 70 words. Use the latest correction if transcripts were revised.",
+      instructions: CHAT_SYSTEM + "\nThis answer will be spoken aloud: no markdown, no citation numbers, at most 70 words. Answer in the language the user spoke, keeping technical terms in English. Use the latest correction if transcripts were revised.",
       reasoning: { effort: "low" },
     },
     { apiKey: config.key, signal, maxRetries: 0, runId: correlation.runID, metadata: { live_session_id: correlation.sessionID, delegation_id: correlation.delegationID } },
@@ -458,8 +473,8 @@ export function bindLiveConnection(
         type: "session.start",
         session: {
           model: config.liveModel,
-          instructions: conversationInstructions(),
-          audio: { output: { voice: "marin" } },
+          instructions: conversationInstructions(config),
+          audio: { output: { voice: config.persona.liveVoice } },
           delegation: { type: "client" },
         },
         transport: { type: "webrtc", sdp },
