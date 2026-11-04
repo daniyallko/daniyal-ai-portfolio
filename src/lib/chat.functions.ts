@@ -60,5 +60,10 @@ export const appendVoiceTurns = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const firstUser = data.turns.find((m) => m.role === "user");
     await supabaseAdmin.from("chat_threads").update({ updated_at: new Date().toISOString(), ...(t.title === "New chat" && firstUser ? { title: `voice: ${firstUser.content.slice(0, 56)}` } : {}) }).eq("id", t.id);
+    const userTurns = data.turns.filter((m) => m.role === "user");
+    if (userTurns.length) {
+      const { notifyOwner, shortId } = await import("@/lib/telegram.server");
+      await notifyOwner([`🎙️ Voice call from visitor ${shortId(data.visitorId)} (${userTurns.length} question${userTurns.length > 1 ? "s" : ""})`, "", ...userTurns.map((m) => `• ${m.content}`)]);
+    }
     return { ok: true };
   });

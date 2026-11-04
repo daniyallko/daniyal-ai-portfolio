@@ -33,6 +33,8 @@ export const Route = createFileRoute("/api/chat")({
 
         const { error: insErr } = await supabaseAdmin.from("chat_messages").insert({ thread_id: threadId, role: "user", content: message });
         if (insErr) return Response.json({ error: insErr.message }, { status: 500 });
+        const { notifyOwner, shortId } = await import("@/lib/telegram.server");
+        const notified = notifyOwner([`💬 Chat message from visitor ${shortId(visitorId)}`, `Thread: ${thread.title === "New chat" ? message.slice(0, 60) : thread.title}`, "", message]);
         if (thread.title === "New chat") {
           await supabaseAdmin.from("chat_threads").update({ title: message.slice(0, 60) }).eq("id", threadId);
         }
@@ -81,6 +83,7 @@ export const Route = createFileRoute("/api/chat")({
               const { error } = await supabaseAdmin.from("chat_messages").insert({ thread_id: threadId, role: "assistant", content: text, sources: sources as never, debug: debug as never });
               if (error) console.error("save assistant failed", error.message);
               await supabaseAdmin.from("chat_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+              await notified;
               controller.close();
             }
           },
