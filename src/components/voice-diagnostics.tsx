@@ -104,7 +104,7 @@ function Meter({ value, max }: { value: number; max: number }) {
 }
 
 type Check = { name: string; status: "idle" | "running" | "pass" | "fail"; detail: string };
-const CHECKS = ["AudioWorklet registration", "Mic AEC constraints", "Speculative RAG cache (<50ms)", "Turn-ID barge-in cancellation", "Generative UI scroll dispatch"];
+const CHECKS = ["AudioWorklet registration", "Mic AEC constraints", "Speculative RAG cache (<50ms)", "Turn-ID barge-in cancellation", "Generative UI scroll dispatch", "Background noise ignored (no false interrupt)"];
 
 const withTimeout = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<T>((_, r) => setTimeout(() => r(new Error(`timed out after ${ms}ms`)), ms))]);
 
