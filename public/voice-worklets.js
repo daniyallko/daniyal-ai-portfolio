@@ -43,7 +43,7 @@ class VadProcessor extends AudioWorkletProcessor {
       this.voicedMs = 0;
       this.port.postMessage({ type: "offset" });
     }
-    if (++this.n % 6 === 0) this.port.postMessage({ type: "level", rms, zcr, speaking: this.speaking, silentMs: this.silentMs, floor: this.floor });
+    if (++this.n % 6 === 0) this.port.postMessage({ type: "level", rms, zcr, speaking: this.speaking, silentMs: this.silentMs, floor: this.floor, crest, voicedMs: this.voicedMs });
     return true;
   }
 }
