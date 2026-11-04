@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { profile, stats, experience, projects, skills, education } from "@/lib/portfolio";
 
@@ -28,7 +29,29 @@ function SectionHead({ n, title, meta }: { n: string; title: string; meta?: stri
   );
 }
 
+// Co-browsing actions from the assistant: /?hl=<element id> or /?skill=<tech>.
+function useCoBrowse() {
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const hl = q.get("hl");
+    const skill = q.get("skill")?.toLowerCase();
+    const targets: Element[] = [];
+    if (hl) { const el = document.getElementById(hl); if (el) targets.push(el); }
+    if (skill) {
+      document.querySelectorAll<HTMLElement>("[data-skill]").forEach((el) => {
+        if (el.dataset.skill!.toLowerCase().includes(skill) || el.dataset.group!.toLowerCase().includes(skill)) targets.push(el);
+      });
+    }
+    if (!targets.length) return;
+    targets[0]!.scrollIntoView({ behavior: "smooth", block: "center" });
+    targets.forEach((el) => el.classList.add("hl-pulse"));
+    const t = setTimeout(() => targets.forEach((el) => el.classList.remove("hl-pulse")), 3200);
+    return () => clearTimeout(t);
+  }, []);
+}
+
 function Index() {
+  useCoBrowse();
   const featured = projects.find((p) => p.featured)!;
   const others = projects.filter((p) => !p.featured);
   return (
@@ -62,7 +85,7 @@ function Index() {
             <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-muted-foreground">{profile.summary}</p>
           </div>
           <div className="flex flex-col font-mono text-xs">
-            <dl className="divide-y divide-border border-b border-border">
+            <dl id="contact" className="divide-y divide-border border-b border-border">
               {[
                 ["location", profile.location],
                 ["status", profile.availability],
@@ -105,7 +128,7 @@ function Index() {
         {/* Work */}
         <section id="work" className="border-b border-border">
           <SectionHead n="01" title="selected_work" meta={`${projects.length} entries`} />
-          <article className="grid gap-px bg-border md:grid-cols-[1fr_1fr]">
+          <article id={`proj-${featured.id}`} className="grid gap-px bg-border md:grid-cols-[1fr_1fr]">
             <div className={`${cell} md:p-8`}>
               <p className="font-mono text-xs text-primary">★ featured · {featured.kind}</p>
               <h2 className="mt-3 text-4xl font-bold tracking-tight">{featured.name}</h2>
@@ -118,7 +141,7 @@ function Index() {
           </article>
           <ol className="divide-y divide-border border-t border-border">
             {others.map((p, i) => (
-              <li key={p.id} className="grid gap-2 px-6 py-5 transition-colors hover:bg-card md:grid-cols-[48px_220px_1fr_auto] md:items-baseline md:gap-6">
+              <li key={p.id} id={`proj-${p.id}`} className="grid gap-2 px-6 py-5 transition-colors hover:bg-card md:grid-cols-[48px_220px_1fr_auto] md:items-baseline md:gap-6">
                 <span className="font-mono text-xs text-muted-foreground">{String(i + 2).padStart(2, "0")}</span>
                 <div>
                   <h3 className="font-semibold">{p.name}</h3>
@@ -164,7 +187,7 @@ function Index() {
               <div key={s.group} className={cell}>
                 <p className={label}>{s.group}</p>
                 <ul className="mt-4 space-y-1 font-mono text-xs text-foreground">
-                  {s.items.map((i) => <li key={i}><span className="text-muted-foreground">·</span> {i}</li>)}
+                  {s.items.map((i) => <li key={i} data-skill={i} data-group={s.group}><span className="text-muted-foreground">·</span> {i}</li>)}
                 </ul>
               </div>
             ))}
