@@ -28,9 +28,10 @@ class VadProcessor extends AudioWorkletProcessor {
     const zcr = z / ch.length;
     const crest = rms > 0 ? peak / rms : 99;
     const frameMs = (ch.length / sampleRate) * 1000;
-    if (!this.speaking) this.floor = this.floor * 0.995 + Math.min(rms, 0.05) * 0.005;
+    // Minimum-tracking noise floor: drops fast to quiet, rises slowly (~3s) so speech doesn't raise it.
+    if (!this.speaking) this.floor = rms < this.floor ? this.floor * 0.9 + rms * 0.1 : Math.min(0.05, this.floor * 0.9995 + rms * 0.0005);
     this.zcrAvg = this.zcrAvg * 0.9 + zcr * 0.1;
-    const voiced = rms > Math.max(0.02, this.floor * 4) && zcr > 0.004 && zcr < 0.25 && this.zcrAvg < 0.25 && crest < 8;
+    const voiced = rms > Math.max(0.02, this.floor * 4) && this.zcrAvg > 0.004 && this.zcrAvg < 0.25 && crest < 8;
     // Leaky integrator: voiced frames add time, other frames drain it faster.
     this.voicedMs = voiced ? Math.min(250, this.voicedMs + frameMs) : Math.max(0, this.voicedMs - frameMs * 1.5);
     if (voiced) this.silentMs = 0; else this.silentMs += frameMs;
