@@ -3,6 +3,7 @@ import { Activity, ChevronDown } from "lucide-react";
 import type { VoiceTelemetry } from "@/hooks/use-live-voice";
 import type { VoicePersona } from "@/config/voicePersonas";
 import { bridgeQuery, polyglotFirstClause, splitSentences, type DetectedLanguage, type LangCode } from "@/lib/language";
+import { PolyglotAdaptiveChunker, detectLanguageAndRegister, getMultilingualEndpointTimeoutMs, normalizeCrossLingualRagQuery } from "@/lib/multilingualVoiceEngine";
 import { actionHref, actionLabel, detectActions, type UiAction } from "@/lib/voice-logic";
 
 export type OrbState = "idle" | "listening" | "retrieving" | "thinking" | "speaking";
@@ -193,7 +194,7 @@ async function checkDispatch(): Promise<string> {
 
 const RUNNERS = [checkWorklet, checkMic, checkCache, checkBargeIn, checkDispatch];
 
-const ML_CHECKS = ["Cross-lingual RAG bridge (Hindi → English, <50ms)", "Polyglot clause split (। and 。)", "Mid-turn voice hot-swap (no underruns)"];
+const ML_CHECKS = ["Engine: Hinglish detect (hi, code-switched)", "Engine: cross-lingual normalize (<5ms)", "Engine: chunker splits on । and 。", "Cross-lingual RAG bridge (Hindi → English, <50ms)", "Polyglot clause split (। and 。)", "Mid-turn voice hot-swap (no underruns)"];
 const HINDI_Q = "मुझे आपके Kubernetes और Terraform प्रोजेक्ट्स के बारे में बताइए";
 
 async function checkBridge(): Promise<string> {
@@ -264,7 +265,31 @@ async function checkHotSwap(): Promise<string> {
   } finally { void ctx.close(); }
 }
 
-const ML_RUNNERS = [checkBridge, checkSplit, checkHotSwap];
+async function checkEngineDetect(): Promise<string> {
+  const d = detectLanguageAndRegister("Mujhe aapke Kubernetes aur Terraform projects ke baare mein bataiye");
+  if (d.langCode !== "hi" || !d.isCodeSwitched) throw new Error(`got ${d.langCode}, codeSwitched=${d.isCodeSwitched}`);
+  return `langCode=hi · isCodeSwitched=true · ${d.langName}`;
+}
+
+async function checkEngineNormalize(): Promise<string> {
+  const n = normalizeCrossLingualRagQuery("मुझे आपके Kubernetes प्रोजेक्ट्स के बारे में बताइए");
+  const q = n.englishSearchQuery.toLowerCase();
+  for (const t of ["kubernetes", "projects"]) if (!q.split(/\s+/).includes(t)) throw new Error(`missing "${t}" in "${n.englishSearchQuery}"`);
+  if (n.normalizationTimeMs >= 5) throw new Error(`took ${n.normalizationTimeMs}ms`);
+  return `"${n.englishSearchQuery}" in ${n.normalizationTimeMs}ms`;
+}
+
+async function checkEngineChunker(): Promise<string> {
+  const hi = new PolyglotAdaptiveChunker();
+  const a = hi.pushToken("उन्होंने काम किया। फिर");
+  if (a[0] !== "उन्होंने काम किया।") throw new Error(`Devanagari gave ${JSON.stringify(a)}`);
+  const ja = new PolyglotAdaptiveChunker();
+  const b = ja.pushToken("こんにちは。次");
+  if (b[0] !== "こんにちは。") throw new Error(`CJK gave ${JSON.stringify(b)}`);
+  return `। → ${hi.lastFlushDelimiter} · 。 → ${ja.lastFlushDelimiter}`;
+}
+
+const ML_RUNNERS = [checkEngineDetect, checkEngineNormalize, checkEngineChunker, checkBridge, checkSplit, checkHotSwap];
 
 function Checklist({ checks }: { checks: Check[] }) {
   return (
