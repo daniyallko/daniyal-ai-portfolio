@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Activity, ChevronDown } from "lucide-react";
 import type { VoiceTelemetry } from "@/hooks/use-live-voice";
+import type { VoicePersona } from "@/config/voicePersonas";
+import { bridgeQuery, polyglotFirstClause, splitSentences, type DetectedLanguage, type LangCode } from "@/lib/language";
 import { actionHref, actionLabel, detectActions, type UiAction } from "@/lib/voice-logic";
 
 export type OrbState = "idle" | "listening" | "retrieving" | "thinking" | "speaking";
@@ -191,6 +193,104 @@ async function checkDispatch(): Promise<string> {
 
 const RUNNERS = [checkWorklet, checkMic, checkCache, checkBargeIn, checkDispatch];
 
+const ML_CHECKS = ["Cross-lingual RAG bridge (Hindi → English, <50ms)", "Polyglot clause split (। and 。)", "Mid-turn voice hot-swap (no underruns)"];
+const HINDI_Q = "मुझे आपके Kubernetes और Terraform प्रोजेक्ट्स के बारे में बताइए";
+
+async function checkBridge(): Promise<string> {
+  const b = bridgeQuery(HINDI_Q);
+  for (const t of ["kubernetes", "terraform", "projects"]) if (!b.tokens.includes(t)) throw new Error(`missing English token "${t}"`);
+  if (b.ms >= 25) throw new Error(`normalizer took ${b.ms}ms`);
+  const call = async () => {
+    const r = await fetch("/api/prefetch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: HINDI_Q }) });
+    if (!r.ok) throw new Error(`prefetch HTTP ${r.status}`);
+    return (await r.json()) as { cache: string; ms: number; titles?: string[]; ids?: string[] };
+  };
+  await call();
+  const t0 = performance.now();
+  const warm = await call();
+  const rtt = Math.round(performance.now() - t0);
+  const k8s = (warm.titles ?? []).filter((t, i) => /kubernetes|edwiser|licens|infra|stack/i.test(t + (warm.ids?.[i] ?? "")));
+  if (!k8s.length) throw new Error(`no Kubernetes chunk matched (got ${(warm.titles ?? []).join(", ") || "none"})`);
+  if (warm.ms >= 50) throw new Error(`warm retrieval ${warm.ms}ms`);
+  return `tokens [${b.tokens.join(", ")}] in ${b.ms}ms → ${warm.cache} ${warm.ms}ms (rtt ${rtt}ms) → ${k8s.slice(0, 3).join(" · ")}. Terraform: not in portfolio, no chunk expected.`;
+}
+
+async function checkSplit(): Promise<string> {
+  const hi = polyglotFirstClause("Daniyal ने AI BotKit पर काम किया। उन्होंने Kubernetes पर licensing platform चलाया और 99.9% uptime रखा।");
+  if (hi.delimiter !== "।" || !hi.first.endsWith("।")) throw new Error(`Hindi split on ${String(hi.delimiter)}: "${hi.first}"`);
+  const ja = polyglotFirstClause("DaniyalはAI BotKitの中核部分を構築しました。千以上のサイトで稼働しているマルチチャネルのRAGチャットボットです。");
+  if (ja.delimiter !== "。") throw new Error(`Japanese split on ${String(ja.delimiter)}: "${ja.first}"`);
+  const n = splitSentences("एक। दो। three. 四。").length;
+  if (n !== 4) throw new Error(`sentence split gave ${n}, expected 4`);
+  return `। → "${hi.first}" · 。 → "${ja.first}" · 4/4 mixed-script sentences`;
+}
+
+async function checkHotSwap(): Promise<string> {
+  const ctx = new AudioContext();
+  try {
+    await ctx.audioWorklet.addModule("/voice-worklets.js");
+    await ctx.resume();
+    const node = new AudioWorkletNode(ctx, "ring-player", { outputChannelCount: [1] });
+    const sink = ctx.createGain();
+    sink.gain.value = 0;
+    // Voice A then voice B: two oscillators at different pitches feed the same ring buffer.
+    const a = ctx.createOscillator(); a.frequency.value = 180;
+    const b = ctx.createOscillator(); b.frequency.value = 260;
+    a.connect(node); node.connect(sink).connect(ctx.destination);
+    a.start();
+    let phase: "a" | "swapped" | "b" = "a", swapAt = 0, underrunsAtSwap = -1, resumeMs = -1;
+    const result = new Promise<string>((resolve, reject) => {
+      node.port.onmessage = ({ data }) => {
+        if (data.type !== "level") return;
+        if (phase === "a" && data.rms > 0.05) {
+          phase = "swapped"; swapAt = performance.now(); underrunsAtSwap = data.underruns;
+          node.port.postMessage({ type: "flush" }); // drop voice A's queued audio
+          a.disconnect(); b.connect(node); b.start();
+        } else if (phase === "swapped" && data.rms > 0.05) {
+          phase = "b"; resumeMs = Math.round(performance.now() - swapAt);
+          setTimeout(() => {
+            node.port.onmessage = ({ data: d }) => {
+              if (d.type !== "level") return;
+              node.port.onmessage = null;
+              const extra = d.underruns - underrunsAtSwap;
+              if (extra > 0) reject(new Error(`${extra} underrun(s) after swap`));
+              else resolve(`buffer flushed, new voice audible in ${resumeMs}ms, 0 underruns over 500ms`);
+            };
+          }, 500);
+        }
+      };
+    });
+    return await withTimeout(result, 4000);
+  } finally { void ctx.close(); }
+}
+
+const ML_RUNNERS = [checkBridge, checkSplit, checkHotSwap];
+
+function Checklist({ checks }: { checks: Check[] }) {
+  return (
+    <ul className="space-y-1">
+      {checks.map((c) => (
+        <li key={c.name} className="grid grid-cols-[48px_1fr] gap-2">
+          <span className={`border px-1 text-center ${c.status === "pass" ? "border-primary bg-primary text-primary-foreground" : c.status === "fail" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border text-muted-foreground"}`}>{c.status === "pass" ? "PASS" : c.status === "fail" ? "FAIL" : c.status === "running" ? "…" : "—"}</span>
+          <span><span className="text-foreground">{c.name}</span>{c.detail && <span className="block break-words text-muted-foreground">{c.detail}</span>}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+async function runSuite(runners: (() => Promise<string>)[], set: (fn: (c: Check[]) => Check[]) => void) {
+  for (let i = 0; i < runners.length; i++) {
+    set((cs) => cs.map((c, j) => (j === i ? { ...c, status: "running", detail: "" } : c)));
+    try {
+      const detail = await withTimeout(runners[i]!(), 20000);
+      set((cs) => cs.map((c, j) => (j === i ? { ...c, status: "pass", detail } : c)));
+    } catch (e) {
+      set((cs) => cs.map((c, j) => (j === i ? { ...c, status: "fail", detail: (e as Error).message } : c)));
+    }
+  }
+}
+
 export function TelemetryPanel(props: {
   telemetry: MutableRefObject<VoiceTelemetry>;
   inCall: boolean;
@@ -203,7 +303,14 @@ export function TelemetryPanel(props: {
   ttsTtfaMs: number | null;
   ttsTtfbMs: number | null;
   droppedPackets: number;
+  persona: VoicePersona;
+  detected: DetectedLanguage | null;
+  lock: LangCode | null;
+  bridge: { raw: string; tokens: string[]; normalized: string; ms: number; matched: string[] } | null;
+  delimiter: string | null;
+  swaps: number;
 }) {
+  const [mlChecks, setMlChecks] = useState<Check[]>(ML_CHECKS.map((name) => ({ name, status: "idle", detail: "" })));
   const [open, setOpen] = useState(false);
   const [, tick] = useState(0);
   const [checks, setChecks] = useState<Check[]>(CHECKS.map((name) => ({ name, status: "idle", detail: "" })));
@@ -219,18 +326,9 @@ export function TelemetryPanel(props: {
     const id = setInterval(() => tick((n) => n + 1), 100);
     return () => clearInterval(id);
   }, [open]);
-  const running = checks.some((c) => c.status === "running");
-  const runAll = async () => {
-    for (let i = 0; i < RUNNERS.length; i++) {
-      setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "running", detail: "" } : c)));
-      try {
-        const detail = await withTimeout(RUNNERS[i]!(), 20000);
-        setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "pass", detail } : c)));
-      } catch (e) {
-        setChecks((cs) => cs.map((c, j) => (j === i ? { ...c, status: "fail", detail: (e as Error).message } : c)));
-      }
-    }
-  };
+  const running = checks.some((c) => c.status === "running") || mlChecks.some((c) => c.status === "running");
+  const runAll = () => runSuite(RUNNERS, setChecks);
+  const runMl = () => runSuite(ML_RUNNERS, setMlChecks);
   const t = props.telemetry.current;
   const remaining = t.connectedAt && props.inCall ? Math.max(0, t.maxMs - (Date.now() - t.connectedAt)) : null;
   const fmt = (ms: number | null) => (ms === null ? "—" : `${Math.round(ms)}ms`);
@@ -283,6 +381,34 @@ export function TelemetryPanel(props: {
               <Row k="endpointing" v={mode} />
             </dl>
           </div>
+          <div className="grid gap-px border-t border-border bg-border sm:grid-cols-2">
+            <dl className="bg-card p-3">
+              <p className="mb-1 text-primary">active voice persona</p>
+              <Row k="persona" v={`${props.persona.badge} · ${props.persona.name}`} />
+              <Row k="tts voice_id" v={props.persona.ttsVoice} />
+              <Row k="live voice_id" v={props.persona.liveVoice} />
+              <Row k="tts model" v={props.persona.ttsModel.split("/")[1]!} />
+              <Row k="hot-swaps" v={String(props.swaps)} />
+            </dl>
+            <dl className="bg-card p-3">
+              <p className="mb-1 text-primary">detected spoken language</p>
+              <Row k="iso code" v={props.lock ? `${props.lock} (locked)` : props.detected?.code ?? "—"} />
+              <Row k="language" v={props.detected?.name ?? "—"} />
+              <Row k="script" v={props.detected?.script ?? "—"} />
+              <Row k="code-switching" v={props.detected ? (props.detected.isCodeSwitched ? "ACTIVE (mixed)" : "off") : "—"} />
+              <Row k="chunker flush on" v={props.delimiter ? `"${props.delimiter}"` : "—"} />
+            </dl>
+          </div>
+          <div className="border-t border-border p-3">
+            <p className="mb-1 text-primary">cross-lingual rag bridge</p>
+            {props.bridge ? (
+              <div className="space-y-1 text-muted-foreground">
+                <p><span className="text-foreground">raw:</span> {props.bridge.raw}</p>
+                <p><span className="text-foreground">→ english tokens:</span> {props.bridge.tokens.length ? props.bridge.tokens.join(", ") : "(none needed)"} <span className="tabular-nums">· {props.bridge.ms}ms</span></p>
+                <p><span className="text-foreground">→ matched chunks:</span> {props.bridge.matched.join(" · ") || "none"}</p>
+              </div>
+            ) : <p className="text-muted-foreground">ask a question to populate</p>}
+          </div>
           <div className="border-t border-border p-3">
             <p className="mb-1 text-primary">last generative UI tool call</p>
             <pre className="overflow-x-auto whitespace-pre-wrap break-all text-muted-foreground">{lastTool ? JSON.stringify(toolPayload, null, 1) : "none"}</pre>
@@ -292,14 +418,14 @@ export function TelemetryPanel(props: {
               <p className="text-primary">system check</p>
               <button type="button" onClick={runAll} disabled={running} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run System Check"}</button>
             </div>
-            <ul className="space-y-1">
-              {checks.map((c) => (
-                <li key={c.name} className="grid grid-cols-[48px_1fr] gap-2">
-                  <span className={`border px-1 text-center ${c.status === "pass" ? "border-primary bg-primary text-primary-foreground" : c.status === "fail" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border text-muted-foreground"}`}>{c.status === "pass" ? "PASS" : c.status === "fail" ? "FAIL" : c.status === "running" ? "…" : "—"}</span>
-                  <span><span className="text-foreground">{c.name}</span>{c.detail && <span className="block text-muted-foreground">{c.detail}</span>}</span>
-                </li>
-              ))}
-            </ul>
+            <Checklist checks={checks} />
+          </div>
+          <div className="border-t border-border p-3">
+            <div className="mb-2 flex items-center">
+              <p className="text-primary">multilingual & voice check</p>
+              <button type="button" onClick={runMl} disabled={running} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run Multilingual Check"}</button>
+            </div>
+            <Checklist checks={mlChecks} />
           </div>
         </section>
       )}
