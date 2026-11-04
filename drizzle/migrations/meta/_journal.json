@@ -15,6 +15,13 @@
       "when": 1793692006007,
       "tag": "0001_eval_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793788321115,
+      "tag": "0002_admin_and_visitors",
+      "breakpoints": true
     }
   ]
 }
