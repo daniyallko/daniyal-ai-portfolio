@@ -221,7 +221,7 @@ function ThreadView({ threadId }: { threadId: string }) {
     if (rec !== "idle" || status !== "idle") return;
     speech.stop();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 24000 } });
       const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
       const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       const parts: Blob[] = [];
