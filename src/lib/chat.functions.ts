@@ -59,6 +59,6 @@ export const appendVoiceTurns = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("chat_messages").insert(rows);
     if (error) throw new Error(error.message);
     const firstUser = data.turns.find((m) => m.role === "user");
-    await supabaseAdmin.from("chat_threads").update({ updated_at: new Date().toISOString(), ...(t.title === "New chat" && firstUser ? { title: `🎙 ${firstUser.content.slice(0, 56)}` } : {}) }).eq("id", t.id);
+    await supabaseAdmin.from("chat_threads").update({ updated_at: new Date().toISOString(), ...(t.title === "New chat" && firstUser ? { title: `voice: ${firstUser.content.slice(0, 56)}` } : {}) }).eq("id", t.id);
     return { ok: true };
   });
