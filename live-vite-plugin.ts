@@ -67,6 +67,14 @@ export function liveVoiceDev(): Plugin {
       if (!httpServer) throw new Error("Live voice preview requires Vite's HTTP server");
       const sockets = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
       let disposed = false;
+      // Some dev runtimes don't expose ssrLoadModule; fall back to a native import of the relay.
+      const loadRelay = async (): Promise<typeof import("./src/lib/live-relay.server")> => {
+        try {
+          return (await server.ssrLoadModule("/src/lib/live-relay.server.ts")) as typeof import("./src/lib/live-relay.server");
+        } catch {
+          return await import("./src/lib/live-relay.server");
+        }
+      };
       const upgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
         if (request.url?.split("?", 1)[0] !== "/api/live") return;
         socket.on("error", () => {});
@@ -74,9 +82,7 @@ export function liveVoiceDev(): Plugin {
         timer.unref();
         void (async () => {
           try {
-            const relay = (await server.ssrLoadModule(
-              "/src/lib/live-relay.server.ts",
-            )) as typeof import("./src/lib/live-relay.server");
+            const relay = await loadRelay();
             const config = relay.getLiveConfig(request.url);
             const rejection = relay.validateLiveUpgrade(upgradeRequest(request), { allowMissingOrigin: true });
             if (rejection) return rejectUpgrade(socket, rejection.status);
