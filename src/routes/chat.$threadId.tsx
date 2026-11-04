@@ -9,6 +9,8 @@ import { appendVoiceTurns, getThread } from "@/lib/chat.functions";
 import { actionHref, actionLabel, detectActions, endpointSilenceMs, normalizeQueryKey, truncateToPlayed } from "@/lib/voice-logic";
 import { TelemetryPanel, VoiceOrb, type Dispatch, type PrefetchLog } from "@/components/voice-diagnostics";
 import { getVisitorId } from "@/lib/visitor";
+import { VoiceSwitcher, useVoicePrefs } from "@/components/voice-switcher";
+import { detectLanguage, previewLine, type DetectedLanguage } from "@/lib/language";
 
 export const Route = createFileRoute("/chat/$threadId")({
   ssr: false,
@@ -22,6 +24,7 @@ type Debug = {
   timingsMs?: Record<string, number | null>;
   usage?: unknown;
   cache?: string;
+  bridge?: { raw: string; tokens: string[]; normalized: string; ms: number };
   candidates?: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
 };
 type Msg = { id: string; role: "user" | "assistant"; content: string; sources?: Source[] | undefined; debug?: Debug | undefined; error?: string | undefined };
@@ -52,7 +55,11 @@ function ThreadView({ threadId }: { threadId: string }) {
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
   const [recError, setRecError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const speech = useSpeech();
+  const prefs = useVoicePrefs();
+  const [detected, setDetected] = useState<DetectedLanguage | null>(null);
+  const activeLang = prefs.lock ?? detected?.code ?? null;
+  const speech = useSpeech({ voice: prefs.persona.ttsVoice, lang: activeLang });
+  const noteLanguage = (text: string, hint?: string | null) => { if (text.trim().length >= 3) setDetected(detectLanguage(text, hint)); };
   type Caption = { role: "user" | "assistant"; text: string; turn: number; interrupted?: boolean };
   const [captions, setCaptions] = useState<Caption[]>([]);
   const turnsRef = useRef<Caption[]>([]); // full call transcript, persisted on hang-up
@@ -78,7 +85,7 @@ function ThreadView({ threadId }: { threadId: string }) {
   const prefetch = (text: string) => {
     clearTimeout(prefetchTimer.current);
     setEndpointMs(endpointSilenceMs(text));
-    if (text.trim().split(/\s+/).length <= 4) return;
+    if (text.trim().split(/\s+/).length <= 4 && !/[\u3040-\u30FF\u4E00-\u9FFF]{6}/.test(text)) return;
     prefetchTimer.current = setTimeout(async () => {
       const key = normalizeQueryKey(text);
       if (!key || key === lastPrefetchKey.current) return;
@@ -92,6 +99,7 @@ function ThreadView({ threadId }: { threadId: string }) {
     }, 250);
   };
   const voice = useLiveVoice({
+    url: `/api/live?voice=${prefs.persona.id}${prefs.lock ? `&lang=${prefs.lock}` : ""}`,
     onEvent: (ev: LiveEvent) => {
       if (ev.type === "app.barge_in") {
         // Audio is already flushed locally; confirm the interruption once the user's words arrive.
@@ -122,6 +130,7 @@ function ThreadView({ threadId }: { threadId: string }) {
           if (l && l.role === "user") return [...c.slice(0, -1), { ...l, text: l.text + delta }];
           return [...c, { role: "user", text: delta, turn }];
         });
+        noteLanguage(turnsRef.current[turnsRef.current.length - 1]!.text);
         prefetch(turnsRef.current[turnsRef.current.length - 1]!.text);
         return;
       }
@@ -158,6 +167,18 @@ function ThreadView({ threadId }: { threadId: string }) {
     }).catch(() => {});
   }, [voice.status, visitorId, threadId, qc]);
 
+  // Mid-call voice swap: the provider fixes the voice per session, so reconnect right after the transcript is saved.
+  const restartRef = useRef(false);
+  useEffect(() => {
+    if (voice.status === "closed" && restartRef.current) { restartRef.current = false; voice.start(); }
+  }, [voice.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const choosePersona = (id: string) => {
+    if (id === prefs.persona.id) return;
+    prefs.setPersonaId(id);
+    // Let the new voice settle into the speech hook before re-synthesizing the unplayed clauses.
+    setTimeout(() => speech.hotSwap(), 0);
+    if (inCall) { restartRef.current = true; voice.stop(); }
+  };
   const lastDebug = [...messages].reverse().find((m) => m.role === "assistant" && m.debug?.timingsMs)?.debug;
   const startCall = () => { speech.stop(); turnsRef.current = []; setCaptions([]); turnRef.current = 0; dropAssistantRef.current = false; pendingBargeRef.current = null; voice.start(); };
 
@@ -176,6 +197,7 @@ function ThreadView({ threadId }: { threadId: string }) {
     const message = text.trim();
     if (!message || status !== "idle") return;
     speech.stop();
+    noteLanguage(message);
     setInput("");
     const aid = crypto.randomUUID();
     setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", content: message }]);
@@ -185,7 +207,7 @@ function ThreadView({ threadId }: { threadId: string }) {
     abortRef.current = ac;
     const patch = (fn: (m: Msg) => Msg) => setMessages((ms) => ms.map((m) => (m.id === aid ? fn(m) : m)));
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId, visitorId, message }), signal: ac.signal });
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId, visitorId, message, ...(prefs.lock ? { lang: prefs.lock } : {}) }), signal: ac.signal });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: "Request failed" }));
         throw new Error(err.error ?? "Request failed");
@@ -242,10 +264,11 @@ function ThreadView({ threadId }: { threadId: string }) {
           const fd = new FormData();
           fd.append("file", new File([blob], type.includes("mp4") ? "question.mp4" : "question.webm", { type }));
           const res = await fetch("/api/transcribe", { method: "POST", body: fd });
-          const j = (await res.json()) as { text?: string; error?: string };
+          const j = (await res.json()) as { text?: string; error?: string; language?: string | null };
           if (!res.ok) throw new Error(j.error ?? "Transcription failed");
           if (!j.text) throw new Error("I couldn't hear a question. Try again.");
           setRec("idle");
+          noteLanguage(j.text, j.language);
           void send(j.text);
         } catch (e) { setRec("idle"); setRecError((e as Error).message); }
       };
@@ -277,6 +300,16 @@ function ThreadView({ threadId }: { threadId: string }) {
             <p className="text-sm font-semibold">daniyal.ai</p>
             <p className="font-mono text-xs text-muted-foreground">hybrid RAG · answers cite sources</p>
           </div>
+          <VoiceSwitcher
+            persona={prefs.persona}
+            onPersona={choosePersona}
+            lock={prefs.lock}
+            onLock={prefs.setLock}
+            detected={detected}
+            previewing={speech.id}
+            previewState={speech.state}
+            onPreview={(p) => { if (!inCall) void speech.speak(`preview:${p.id}`, previewLine(activeLang ?? "en", p.gender === "female"), { voice: p.ttsVoice, lang: activeLang ?? "en" }); }}
+          />
         </header>
 
         <div className="flex-1 overflow-y-auto">
@@ -320,7 +353,7 @@ function ThreadView({ threadId }: { threadId: string }) {
 
         <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mx-auto w-full max-w-3xl px-6 pb-6">
           <audio ref={voice.audioRef} className="hidden" />
-          <TelemetryPanel telemetry={voice.telemetry} inCall={inCall} endpointMs={endpointMs} prefetch={prefetchLog} dispatches={dispatches} llmFirstTokenMs={(lastDebug?.timingsMs?.["firstToken"] as number | null | undefined) ?? null} ragCache={lastDebug?.cache ?? null} ragMs={lastDebug?.timingsMs ? (Number(lastDebug.timingsMs["embed"] ?? 0) + Number(lastDebug.timingsMs["retrieve"] ?? 0)) : null} ttsTtfaMs={speech.ttfaMs} ttsTtfbMs={speech.ttfbMs} droppedPackets={droppedPackets} />
+          <TelemetryPanel telemetry={voice.telemetry} inCall={inCall} endpointMs={endpointMs} prefetch={prefetchLog} dispatches={dispatches} llmFirstTokenMs={(lastDebug?.timingsMs?.["firstToken"] as number | null | undefined) ?? null} ragCache={lastDebug?.cache ?? null} ragMs={lastDebug?.timingsMs ? (Number(lastDebug.timingsMs["embed"] ?? 0) + Number(lastDebug.timingsMs["retrieve"] ?? 0)) : null} ttsTtfaMs={speech.ttfaMs} ttsTtfbMs={speech.ttfbMs} droppedPackets={droppedPackets} persona={prefs.persona} detected={detected} lock={prefs.lock} bridge={lastDebug?.bridge ? { ...lastDebug.bridge, matched: (lastDebug.candidates ?? []).filter((c) => c.kept).map((c) => c.title) } : null} delimiter={speech.delimiter} swaps={speech.swaps} />
           {dispatches.length > 0 && (
             <div className="mb-2 flex flex-wrap items-center gap-1 font-mono text-[11px]">
               <span className="text-muted-foreground">open in portfolio:</span>
