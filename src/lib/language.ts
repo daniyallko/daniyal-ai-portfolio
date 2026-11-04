@@ -169,6 +169,8 @@ export const LANGUAGE_RULE = `Language: Reply in the user's language and script.
 /** One-line instruction appended to a turn so the model answers in the detected language. */
 export function replyLanguageHint(d: DetectedLanguage): string {
   if (d.code === "en" && !d.isCodeSwitched) return "";
-  const style = d.code === "hi" && d.isCodeSwitched ? "Hinglish (Hindi mixed with English technical terms)" : `${LANGUAGES[d.code].name} (${d.script} script)`;
-  return `\n(Reply in ${style}. Keep technical terms in English.)`;
+  const style = d.code === "hi" && d.isCodeSwitched
+    ? `Hinglish: Hindi mixed with English technical terms, with the Hindi words written in ${d.script === "Devanagari" ? "Devanagari script (e.g. \"उन्होंने Kubernetes पर काम किया\")" : "Roman letters (e.g. \"unhone Kubernetes par kaam kiya\")"}`
+    : `${LANGUAGES[d.code].name} written in ${d.script} script`;
+  return `\n(Reply in ${style}. Match the user's script exactly. Keep technical terms in English (Latin letters).)`;
 }
