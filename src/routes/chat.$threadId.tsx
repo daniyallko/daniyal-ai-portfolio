@@ -2,10 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2, Volume2, Pause } from "lucide-react";
+import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2, Volume2, Pause, VolumeX } from "lucide-react";
 import { useSpeech } from "@/hooks/use-speech";
 import { useLiveVoice, type LiveEvent } from "@/hooks/use-live-voice";
-import { getThread } from "@/lib/chat.functions";
+import { appendVoiceTurns, getThread } from "@/lib/chat.functions";
+import { actionHref, actionLabel, detectActions, endpointSilenceMs, normalizeQueryKey, truncateToPlayed } from "@/lib/voice-logic";
+import { TelemetryPanel, VoiceOrb, type Dispatch, type PrefetchLog } from "@/components/voice-diagnostics";
 import { getVisitorId } from "@/lib/visitor";
 
 export const Route = createFileRoute("/chat/$threadId")({
@@ -19,6 +21,7 @@ type Debug = {
   model?: string;
   timingsMs?: Record<string, number | null>;
   usage?: unknown;
+  cache?: string;
   candidates?: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
 };
 type Msg = { id: string; role: "user" | "assistant"; content: string; sources?: Source[] | undefined; debug?: Debug | undefined; error?: string | undefined };
@@ -171,6 +174,7 @@ function ThreadView({ threadId }: { threadId: string }) {
     setInput("");
     const aid = crypto.randomUUID();
     setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", content: message }]);
+    dispatch(message, "text");
     setStatus("submitted");
     const ac = new AbortController();
     abortRef.current = ac;
@@ -311,13 +315,32 @@ function ThreadView({ threadId }: { threadId: string }) {
 
         <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mx-auto w-full max-w-3xl px-6 pb-6">
           <audio ref={voice.audioRef} className="hidden" />
+          <TelemetryPanel telemetry={voice.telemetry} inCall={inCall} endpointMs={endpointMs} prefetch={prefetchLog} dispatches={dispatches} llmFirstTokenMs={(lastDebug?.timingsMs?.["firstToken"] as number | null | undefined) ?? null} ragCache={lastDebug?.cache ?? null} ttsTtfaMs={speech.ttfaMs} />
+          {dispatches.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-1 font-mono text-[11px]">
+              <span className="text-muted-foreground">open in portfolio:</span>
+              {dispatches.slice(-3).map((d) => (
+                <a key={d.at + d.href} href={d.href} target={inCall ? "_blank" : undefined} rel="noreferrer" className="border border-border px-1.5 py-0.5 text-primary hover:border-primary">{actionLabel(d.action)} ↗</a>
+              ))}
+            </div>
+          )}
+          {!inCall && voice.endReason && (
+            <div role="status" className="mb-2 flex items-center gap-3 border border-border bg-card px-3 py-2 font-mono text-xs">
+              <span className="text-muted-foreground">{voice.endReason === "idle" ? "Call paused after 15s of silence." : "5-minute voice limit reached."}</span>
+              <button type="button" onClick={startCall} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground">resume call</button>
+            </div>
+          )}
           {(inCall || voice.error) && (
             <div className="mb-2 rounded-xl border border-primary/40 bg-card p-3">
+              {inCall && <div className="float-right ml-3"><VoiceOrb telemetry={voice.telemetry} active={voice.status === "connected"} retrievingRef={retrievingRef} /></div>}
               <div className="flex items-center gap-2 font-mono text-xs">
                 <span className={`inline-block h-2 w-2 rounded-full ${voice.status === "connected" ? "animate-pulse bg-primary" : "bg-muted-foreground"}`} />
                 <span className="text-muted-foreground">{voice.status === "connected" ? (voice.muted ? "voice call · muted" : "voice call · listening — just talk, interrupt anytime") : voice.status === "connecting" ? "connecting voice…" : voice.status === "stopping" ? "ending call…" : "voice call ended"}</span>
                 {voice.status === "connected" && (
                   <button type="button" onClick={() => voice.setMuted(!voice.muted)} className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:text-foreground">{voice.muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}{voice.muted ? "unmute" : "mute"}</button>
+                )}
+                {voice.status === "connected" && (
+                  <button type="button" onClick={() => voice.setOutputMuted(!voice.outputMuted)} aria-pressed={voice.outputMuted} className="flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:text-foreground">{voice.outputMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}{voice.outputMuted ? "voice off" : "voice on"}</button>
                 )}
                 {inCall && (
                   <button type="button" onClick={voice.stop} disabled={voice.status === "stopping"} className={`${voice.status === "connected" ? "" : "ml-auto "}flex items-center gap-1 rounded-md bg-destructive px-2 py-1 text-destructive-foreground disabled:opacity-50`}><PhoneOff className="h-3.5 w-3.5" />end</button>
@@ -327,7 +350,7 @@ function ThreadView({ threadId }: { threadId: string }) {
               {voice.error && <p role="alert" className="mt-2 text-xs text-destructive">{voice.error}</p>}
               {captions.length > 0 && (
                 <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-sm">
-                  {captions.map((c, i) => <p key={i} className={c.role === "user" ? "text-muted-foreground" : "text-foreground"}><span className="font-mono text-xs text-primary">{c.role === "user" ? "you › " : "ai › "}</span>{c.text}</p>)}
+                  {captions.map((c, i) => <p key={i} className={c.role === "user" ? "text-muted-foreground" : "text-foreground"}><span className="font-mono text-xs text-primary">{c.role === "user" ? "you › " : "ai › "}</span>{c.text}{c.interrupted && <span className="ml-1 font-mono text-xs text-muted-foreground">— interrupted</span>}</p>)}
                 </div>
               )}
             </div>
@@ -347,7 +370,7 @@ function ThreadView({ threadId }: { threadId: string }) {
             <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               {rec === "transcribing" ? <Loader2 className="h-4 w-4 animate-spin" /> : rec === "recording" ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-4 w-4" />}
             </button>
-            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={() => { speech.stop(); setCaptions([]); voice.start(); }} disabled={inCall || rec !== "idle"} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={startCall} disabled={inCall || rec !== "idle"} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               <AudioLines className="h-4 w-4" />
             </button>
             {status === "idle" ? (
