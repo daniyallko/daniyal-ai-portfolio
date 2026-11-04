@@ -41,3 +41,24 @@ export const deleteThread = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+const Turns = VT.extend({
+  turns: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(4000) })).max(60),
+});
+
+// Persist a finished voice call's turns into the same thread as text chat.
+export const appendVoiceTurns = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => Turns.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: t } = await supabaseAdmin.from("chat_threads").select("id, title").eq("id", data.threadId).eq("visitor_id", data.visitorId).maybeSingle();
+    if (!t) throw new Error("Thread not found");
+    if (!data.turns.length) return { ok: true };
+    const base = Date.now();
+    const rows = data.turns.map((m, i) => ({ thread_id: t.id, role: m.role, content: m.content, debug: { via: "voice" } as never, created_at: new Date(base + i).toISOString() }));
+    const { error } = await supabaseAdmin.from("chat_messages").insert(rows);
+    if (error) throw new Error(error.message);
+    const firstUser = data.turns.find((m) => m.role === "user");
+    await supabaseAdmin.from("chat_threads").update({ updated_at: new Date().toISOString(), ...(t.title === "New chat" && firstUser ? { title: `🎙 ${firstUser.content.slice(0, 56)}` } : {}) }).eq("id", t.id);
+    return { ok: true };
+  });
