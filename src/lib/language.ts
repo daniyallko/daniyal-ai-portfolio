@@ -170,7 +170,7 @@ export const LANGUAGE_RULE = `Language: Reply in the user's language and script.
 export function replyLanguageHint(d: DetectedLanguage): string {
   if (d.code === "en" && !d.isCodeSwitched) return "";
   const style = d.code === "hi" && d.isCodeSwitched
-    ? `Hinglish: Hindi mixed with English technical terms, with the Hindi words written in ${d.script === "Devanagari" ? "Devanagari script (e.g. \"उन्होंने Kubernetes पर काम किया\")" : "Roman letters (e.g. \"unhone Kubernetes par kaam kiya\")"}`
+    ? `Hinglish: Hindi mixed with English technical terms, with every Hindi word written in ${d.script === "Devanagari" ? "Devanagari script (never romanized) (e.g. \"उन्होंने Kubernetes पर काम किया\")" : "Roman letters (e.g. \"unhone Kubernetes par kaam kiya\")"}`
     : `${LANGUAGES[d.code].name} written in ${d.script} script`;
   return `\n(Reply in ${style}. Match the user's script exactly. Keep technical terms in English (Latin letters).)`;
 }
