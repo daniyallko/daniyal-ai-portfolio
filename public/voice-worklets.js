@@ -56,7 +56,7 @@ class RingPlayer extends AudioWorkletProcessor {
     this.size = sampleRate; // 1s capacity
     this.buf = new Float32Array(this.size);
     this.w = 0; this.r = 0; this.fill = 0;
-    this.prefill = 256; this.primed = false;
+    this.prefill = Math.round(sampleRate * 0.04); this.primed = false; this.gain = 0; // 40ms jitter cushion + click-free fades
     this.ducked = false; this.muted = false;
     this.underruns = 0; this.playedSpeech = 0; this.n = 0; this.inRms = 0;
     this.port.onmessage = ({ data }) => {
@@ -89,7 +89,11 @@ class RingPlayer extends AudioWorkletProcessor {
         s = this.buf[this.r];
         this.r = (this.r + 1) % this.size;
         this.fill--;
-      } else if (this.primed) { this.primed = false; this.underruns++; }
+        // Fade out over the last ~3ms of buffered audio instead of cutting to silence.
+        const target = this.fill < 128 ? this.fill / 128 : 1;
+        this.gain += (target - this.gain) * 0.02;
+      } else if (this.primed) { this.primed = false; this.underruns++; this.gain = 0; }
+      s *= this.gain;
       if (this.muted) s = 0;
       oe += s * s;
       for (let c = 0; c < out.length; c++) out[c][i] = s;

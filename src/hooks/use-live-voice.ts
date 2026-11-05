@@ -202,6 +202,11 @@ function createLiveVoice(options: LiveOptions) {
   let userTranscriptSinceBarge = false;
   let userEndAt: number | null = null;
 
+  // WebKit (all iPhone/iPad browsers, desktop Safari) crackles when WebRTC audio is re-routed
+  // through Web Audio while the mic is open; play natively via the WebRTC jitter buffer there.
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  const nativePlayback = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1) || (/Safari/.test(ua) && !/Chrome|Chromium|Android|CriOS|Edg/.test(ua));
+
   function setDuck(on: boolean) {
     tel.ducked = on;
     player?.port.postMessage({ type: "duck", on });
@@ -275,9 +280,16 @@ function createLiveVoice(options: LiveOptions) {
       await workletReady;
       if (state === "stopping" || state === "closed") return false;
       const src = ctx.createMediaStreamSource(stream);
-      const node = new AudioWorkletNode(ctx, "ring-player", { outputChannelCount: [1] });
       const an = ctx.createAnalyser();
       an.fftSize = 512;
+      if (nativePlayback) {
+        // Analyser only (visualizer/telemetry); the <audio> element does the playing.
+        src.connect(an);
+        tel.outAnalyser = an;
+        void ctx.resume();
+        return false;
+      }
+      const node = new AudioWorkletNode(ctx, "ring-player", { outputChannelCount: [1] });
       src.connect(node).connect(an).connect(ctx.destination);
       node.port.onmessage = ({ data }) => { if (data.type === "level") onPlayerLevel(data); };
       node.port.postMessage({ type: "mute", on: outputMuted });
@@ -478,7 +490,7 @@ function createLiveVoice(options: LiveOptions) {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 24000 },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       });
       microphone = stream;
       if (!starting()) {
@@ -499,7 +511,7 @@ function createLiveVoice(options: LiveOptions) {
         options.audio.srcObject = playback;
         // Chrome only feeds remote WebRTC audio into Web Audio when an element holds the stream;
         // keep it muted and play through the AudioWorklet ring buffer instead.
-        options.audio.muted = true;
+        options.audio.muted = nativePlayback ? outputMuted : true;
         void setupPlayback(playback).then((ok) => {
           if (!ok) options.audio.muted = outputMuted;
           void resumePlayback();
