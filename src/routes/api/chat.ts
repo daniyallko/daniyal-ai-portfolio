@@ -7,6 +7,7 @@ const Body = z.object({
   visitorId: z.string().uuid(),
   message: z.string().trim().min(1).max(2000),
   lang: z.string().max(5).optional(),
+  cachedKey: z.string().max(4000).optional(),
 });
 
 import { looksOffTopic } from "@/lib/voice-logic";
@@ -21,6 +22,13 @@ export const Route = createFileRoute("/api/chat")({
         const parsed = Body.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return Response.json({ error: "Invalid request" }, { status: 400 });
         const { threadId, visitorId, message, lang } = parsed.data;
+        const { answerKey, canShareAnswer, canonicalQuery, fingerprint } = await import("@/lib/rag-cache");
+        const { makeEntry, readCache, remember, persistCache, touchCache } = await import("@/server/rag-cache.server");
+        const { defer } = await import("@/lib/background.server");
+        const { detectActions } = await import("@/lib/voice-logic");
+        const started = Date.now();
+        const version = fingerprint(MODEL + SYSTEM);
+        const key = answerKey(message, version, lang);
         const detected = isLangCode(lang) ? { ...detectLanguage(message), code: lang, name: LANGUAGES[lang].name } : detectLanguage(message);
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { retrieve } = await import("@/server/rag.server");
@@ -30,6 +38,8 @@ export const Route = createFileRoute("/api/chat")({
 
         const { data: history, error: hErr } = await supabaseAdmin.from("chat_messages").select("role, content").eq("thread_id", threadId).order("created_at");
         if (hErr) return Response.json({ error: hErr.message }, { status: 500 });
+        const shareable = canShareAnswer(message, history?.length ?? 0) && !looksOffTopic(message);
+        const cached = shareable ? await readCache(key).catch(() => null) : null;
 
         const { error: insErr } = await supabaseAdmin.from("chat_messages").insert({ thread_id: threadId, role: "user", content: message });
         if (insErr) return Response.json({ error: insErr.message }, { status: 500 });
@@ -51,8 +61,20 @@ export const Route = createFileRoute("/api/chat")({
             let text = "";
             let sources: unknown = [];
             let debug: Record<string, unknown> = {};
+            let completed = false;
             try {
-              const r = await retrieve(query);
+              if (cached?.entry.text) {
+                text = cached.entry.text;
+                sources = cached.entry.sources;
+                debug = { cache: cached.tier, browserHint: parsed.data.cachedKey === key, model: MODEL, language: detected, timingsMs: { embed: 0, retrieve: 0, firstToken: Date.now() - started, total: Date.now() - started } };
+                send({ type: "sources", sources, debug });
+                send({ type: "delta", text });
+                send({ type: "done", debug, cacheEntry: cached.entry, toolCalls: cached.entry.tools });
+                await defer(request, touchCache(key));
+                completed = true;
+                return;
+              }
+              const r = await retrieve(query, 5, request);
               sources = r.sources;
               debug = { ...r.debug, model: MODEL, language: detected };
               send({ type: "sources", sources: r.sources, debug });
@@ -73,7 +95,14 @@ export const Route = createFileRoute("/api/chat")({
                 } else if (ev.type === "response.completed") usage = ev.response?.usage ?? null;
               }
               debug = { ...debug, timingsMs: { ...(debug["timingsMs"] as object), firstToken, total: Date.now() - t0 }, usage };
-              send({ type: "done", debug });
+              completed = !request.signal.aborted && text.trim().length > 0;
+              const entry = shareable && completed && r.sources.length ? makeEntry(key, canonicalQuery(message), r.sources, text, detectActions(message), detected.code) : null;
+              if (entry) {
+                remember(entry);
+                // Start persistence before announcing completion; waitUntil keeps it alive after disconnect.
+                await defer(request, persistCache(entry, Date.now() - t0));
+              }
+              send({ type: "done", debug, cacheEntry: entry, toolCalls: entry?.tools ?? [] });
             } catch (e) {
               const msg = e instanceof GatewayError ? e.message : "Something went wrong generating the answer.";
               console.error(e);

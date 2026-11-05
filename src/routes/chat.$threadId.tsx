@@ -11,9 +11,19 @@ import { TelemetryPanel, VoiceOrb, type Dispatch, type PrefetchLog } from "@/com
 import { getVisitorId } from "@/lib/visitor";
 import { VoiceSwitcher, useVoicePrefs } from "@/components/voice-switcher";
 import { detectLanguage, previewLine, type DetectedLanguage } from "@/lib/language";
+import { browserCache, rememberBrowser } from "@/lib/rag-browser";
+import { answerKey, fingerprint, retrievalKey, type CacheEntry } from "@/lib/rag-cache";
+import { CHAT_MODEL, CHAT_SYSTEM } from "@/lib/prompt";
 
 export const Route = createFileRoute("/chat/$threadId")({
   ssr: false,
+  head: () => ({ meta: [
+    { title: "Recruiter Assistant — Mohd Daniyal" },
+    { name: "description", content: "Ask Mohd Daniyal’s portfolio assistant about projects, engineering experience and technical skills." },
+    { property: "og:title", content: "Mohd Daniyal — Recruiter Assistant" },
+    { property: "og:description", content: "Cited portfolio answers and multilingual voice conversations." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: ThreadPage,
 });
 
@@ -90,14 +100,23 @@ function ThreadView({ threadId }: { threadId: string }) {
       const key = normalizeQueryKey(text);
       if (!key || key === lastPrefetchKey.current) return;
       lastPrefetchKey.current = key;
+      if (browserCache(retrievalKey(text))) {
+        setPrefetchLog((l) => [...l, { query: text, cache: "L1", ms: 0 }].slice(-20));
+        return;
+      }
       retrievingRef.current = true;
       try {
         const r = await fetch("/api/prefetch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: text }) });
-        const j = (await r.json()) as { cache?: string; ms?: number };
+        const j = (await r.json()) as { cache?: string; ms?: number; entry?: CacheEntry | null };
+        if (j.entry) rememberBrowser([j.entry]);
         if (r.ok) setPrefetchLog((l) => [...l, { query: text, cache: j.cache ?? "miss", ms: j.ms ?? 0 }].slice(-20));
       } catch { /* speculative only */ } finally { retrievingRef.current = false; }
     }, 250);
   };
+  useEffect(() => {
+    if (input.trim()) prefetch(input);
+    return () => clearTimeout(prefetchTimer.current);
+  }, [input]); // eslint-disable-line react-hooks/exhaustive-deps
   const voice = useLiveVoice({
     url: `/api/live?voice=${prefs.persona.id}${prefs.lock ? `&lang=${prefs.lock}` : ""}`,
     onEvent: (ev: LiveEvent) => {
@@ -207,7 +226,8 @@ function ThreadView({ threadId }: { threadId: string }) {
     abortRef.current = ac;
     const patch = (fn: (m: Msg) => Msg) => setMessages((ms) => ms.map((m) => (m.id === aid ? fn(m) : m)));
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId, visitorId, message, ...(prefs.lock ? { lang: prefs.lock } : {}) }), signal: ac.signal });
+      const local = browserCache(answerKey(message, fingerprint(CHAT_MODEL + CHAT_SYSTEM), prefs.lock ?? undefined));
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId, visitorId, message, ...(local ? { cachedKey: local.key } : {}), ...(prefs.lock ? { lang: prefs.lock } : {}) }), signal: ac.signal });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: "Request failed" }));
         throw new Error(err.error ?? "Request failed");
@@ -227,7 +247,10 @@ function ThreadView({ threadId }: { threadId: string }) {
           const ev = JSON.parse(line);
           if (ev.type === "sources") patch((m) => ({ ...m, sources: ev.sources, debug: ev.debug }));
           else if (ev.type === "delta") { setStatus("streaming"); patch((m) => ({ ...m, content: m.content + ev.text })); }
-          else if (ev.type === "done") patch((m) => ({ ...m, debug: ev.debug }));
+          else if (ev.type === "done") {
+            patch((m) => ({ ...m, debug: ev.debug }));
+            if (ev.cacheEntry) rememberBrowser([ev.cacheEntry]);
+          }
           else if (ev.type === "error") patch((m) => ({ ...m, error: ev.message }));
         }
       }
