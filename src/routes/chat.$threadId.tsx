@@ -443,10 +443,10 @@ function ThreadView({ threadId }: { threadId: string }) {
               placeholder={rec === "recording" ? "Recording… tap the mic to finish" : rec === "transcribing" ? "Transcribing…" : "Ask about experience, projects, stack…"}
               className="max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground"
             />
-            <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               {rec === "transcribing" ? <Loader2 className="h-4 w-4 animate-spin" /> : rec === "recording" ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-4 w-4" />}
             </button>
-            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={startCall} disabled={inCall || rec !== "idle"} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={startCall} disabled={inCall || rec !== "idle"} className={`flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               <AudioLines className="h-4 w-4" />
             </button>
             {status === "idle" ? (
