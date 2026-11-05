@@ -1,6 +1,5 @@
 import { generateEmbeddings } from "@lovable.dev/ai-gateway";
 import { buildChunks, type Chunk } from "@/lib/portfolio";
-import { normalizeQueryKey } from "@/lib/voice-logic";
 import { bridgeQuery } from "@/lib/language";
 import { detectLanguageAndRegister, normalizeCrossLingualRagQuery } from "@/lib/multilingualVoiceEngine";
 import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
@@ -64,7 +63,7 @@ export type RetrievalDebug = {
   candidates: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
 };
 
-// Warm in-memory cache keyed by normalized query tokens (speculative prefetch + repeat questions).
+// Versioned query promises coalesce speculative prefetch + repeat questions per isolate.
 const CACHE_TTL = 5 * 60_000;
 const warm = new Map<string, { at: number; value: Promise<{ sources: Source[]; debug: RetrievalDebug }> }>();
 

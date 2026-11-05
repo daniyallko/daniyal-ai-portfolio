@@ -11,8 +11,12 @@ export const CACHE_LIMIT = 100;
 export const CACHE_TTL = 7 * 24 * 60 * 60_000;
 export function fingerprint(text: string): string {
   let h = 2166136261;
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-  return (h >>> 0).toString(36);
+  let second = 5381;
+  for (let i = 0; i < text.length; i++) {
+    h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+    second = Math.imul(second, 33) ^ text.charCodeAt(i);
+  }
+  return `${(h >>> 0).toString(36)}-${(second >>> 0).toString(36)}`;
 }
 export function corpusVersion(): string {
   return fingerprint(JSON.stringify(buildChunks()));

@@ -39,7 +39,9 @@ export const Route = createFileRoute("/api/chat")({
         const { data: history, error: hErr } = await supabaseAdmin.from("chat_messages").select("role, content").eq("thread_id", threadId).order("created_at");
         if (hErr) return Response.json({ error: hErr.message }, { status: 500 });
         const shareable = canShareAnswer(message, history?.length ?? 0) && !looksOffTopic(message);
+        const lookupStarted = performance.now();
         const cached = shareable ? await readCache(key).catch(() => null) : null;
+        const cacheLookupMs = +(performance.now() - lookupStarted).toFixed(2);
 
         const { error: insErr } = await supabaseAdmin.from("chat_messages").insert({ thread_id: threadId, role: "user", content: message });
         if (insErr) return Response.json({ error: insErr.message }, { status: 500 });
@@ -66,7 +68,7 @@ export const Route = createFileRoute("/api/chat")({
               if (cached?.entry.text) {
                 text = cached.entry.text;
                 sources = cached.entry.sources;
-                debug = { cache: cached.tier, browserHint: parsed.data.cachedKey === key, model: MODEL, language: detected, timingsMs: { embed: 0, retrieve: 0, firstToken: Date.now() - started, total: Date.now() - started } };
+                debug = { cache: cached.tier, browserHint: parsed.data.cachedKey === key, model: MODEL, language: detected, timingsMs: { cacheLookup: cacheLookupMs, embed: 0, retrieve: 0, firstToken: Date.now() - started, total: Date.now() - started } };
                 send({ type: "sources", sources, debug });
                 send({ type: "delta", text });
                 send({ type: "done", debug, cacheEntry: cached.entry, toolCalls: cached.entry.tools });

@@ -22,3 +22,12 @@ Baseline measured locally before changes: first `/api/prefetch` request **3,835m
 
 ## Targets, not guarantees
 5–35ms applies to hot lookup, not global network delivery, fresh inference, transcription, TTS or cold worker scheduling. Cold starts cannot be eliminated on every isolate by a previous visitor.
+
+## Verification
+- 31 focused tests passed: cache eligibility, privacy, language/register keys, translated topic labels, negation/numbers, prompt invalidation, TTL/LRU bounds and deferred-write lifecycle plus existing multilingual/retrieval tests.
+- Browser: page-load warming returned 200; typing warmed retrieval; first public answer streamed and entered browser/shared caches; reloading restored saved conversation.
+- A separate browser visitor could not open the first visitor's thread. The same standalone question in the second visitor's new thread reused L2 output with citations and persisted independently.
+- Hot retrieval measured **2ms / 4.73ms HTTP** after changes. Cached answer first output still took **1,613ms server / 2,271ms UI flow**, due to ownership/history/message database operations. Instant lookup is not instant end-to-end response.
+- Database readback confirmed two cache rows, one completed public answer, and hit count incremented to two.
+- Browser cache skips already warmed speculative retrieval and provides answer key hints; server validates entries before delivering cached answers, not an unsafe bypass of session persistence.
+- Live spoken caching was not verified. Arbitrary semantic/cross-language equivalence and sub-35ms full answer delivery remain outside the deterministic safe implementation.
