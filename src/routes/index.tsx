@@ -289,7 +289,7 @@ function Hero() {
           )}
         </div>
         <div className="flex items-center gap-2 border-t border-hairline px-1 pt-2">
-          <div className="min-w-0 [&>div]:ml-0">
+          <div className="min-w-0 [&>div]:!ml-0">
             <VoiceSwitcher
               persona={prefs.persona}
               onPersona={prefs.setPersonaId}
