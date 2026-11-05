@@ -69,7 +69,7 @@ function EvalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background bg-grid">
+    <div className="min-h-[100dvh] bg-background bg-grid">
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="flex flex-wrap items-center gap-4">
           <Link to="/chat" className="flex items-center gap-1.5 font-mono text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />chat</Link>

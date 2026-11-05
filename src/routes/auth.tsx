@@ -40,7 +40,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background p-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-4 border border-border bg-card p-6">
         <div className="font-mono text-xs text-primary">$ admin --{mode === "in" ? "login" : "register"}</div>
         <h1 className="text-xl font-semibold">{mode === "in" ? "Sign in" : "Create owner account"}</h1>

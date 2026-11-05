@@ -40,7 +40,7 @@ function ChatLayout() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-[100dvh] bg-background">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
         <div className="flex items-center justify-between p-4">
           <Link to="/" className="flex items-center gap-1.5 font-mono text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />portfolio</Link>
