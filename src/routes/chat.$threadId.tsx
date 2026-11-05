@@ -209,6 +209,21 @@ function ThreadView({ threadId }: { threadId: string }) {
     });
   }, [threadId, visitorId]);
 
+  // Hand-off from the homepage command dock: send its question or start a live call once.
+  const pendingDone = useRef(false);
+  useEffect(() => {
+    if (loaded !== "ok" || pendingDone.current) return;
+    pendingDone.current = true;
+    const raw = sessionStorage.getItem("daniyal.pending.v1");
+    if (!raw) return;
+    sessionStorage.removeItem("daniyal.pending.v1");
+    try {
+      const p = JSON.parse(raw) as { q?: string; call?: boolean };
+      if (p.call) startCall();
+      else if (p.q) void send(p.q);
+    } catch { /* ignore */ }
+  }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, status]);
   useEffect(() => { if (status === "idle") taRef.current?.focus(); }, [status, loaded]);
 
@@ -428,16 +443,16 @@ function ThreadView({ threadId }: { threadId: string }) {
               placeholder={rec === "recording" ? "Recording… tap the mic to finish" : rec === "transcribing" ? "Transcribing…" : "Ask about experience, projects, stack…"}
               className="max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground"
             />
-            <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               {rec === "transcribing" ? <Loader2 className="h-4 w-4 animate-spin" /> : rec === "recording" ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-4 w-4" />}
             </button>
-            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={startCall} disabled={inCall || rec !== "idle"} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={startCall} disabled={inCall || rec !== "idle"} className={`flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
               <AudioLines className="h-4 w-4" />
             </button>
             {status === "idle" ? (
-              <button type="submit" aria-label="Send" disabled={!input.trim()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
+              <button type="submit" aria-label="Send" disabled={!input.trim()} className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
             ) : (
-              <button type="button" aria-label="Stop" onClick={() => abortRef.current?.abort()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground"><Square className="h-3.5 w-3.5" /></button>
+              <button type="button" aria-label="Stop" onClick={() => abortRef.current?.abort()} className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground"><Square className="h-3.5 w-3.5" /></button>
             )}
           </div>
         </form>

@@ -50,7 +50,7 @@ function AdminPage() {
   const current = list.find((v) => v.id === vid);
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex h-[100dvh] flex-col bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3 font-mono text-xs">
         <span className="flex gap-4"><span className="text-primary">●</span>
           <button onClick={() => setTab("sessions")} className={tab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}>sessions ({list.length})</button>
