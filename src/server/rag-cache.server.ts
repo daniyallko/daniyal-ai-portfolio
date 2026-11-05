@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { BoundedCache, CACHE_TTL, corpusVersion, type CacheEntry } from "@/lib/rag-cache";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
@@ -43,8 +43,8 @@ export async function persistCache(entry: CacheEntry, computeMs: number) {
   const { error } = await supabaseAdmin.from("rag_query_cache").upsert({
     cache_key: entry.key, canonical_english_query: entry.query, lang_code: entry.lang,
     matched_chunk_ids: entry.sources.map((s) => s.id), retrieved_context: entry.sources.map((s) => `[${s.n}] ${s.title}\n${s.text}`).join("\n\n"),
-    response_text: entry.text, sources: entry.sources as unknown as Database['public']['Tables']['rag_query_cache']['Insert']['sources'],
-    tool_calls: entry.tools as Database['public']['Tables']['rag_query_cache']['Insert']['tool_calls'],
+    response_text: entry.text, sources: entry.sources as unknown as Json,
+    tool_calls: entry.tools as Json,
     corpus_version: entry.version, compute_saved_ms: Math.round(computeMs), expires_at: new Date(entry.expiresAt).toISOString(),
   }, { onConflict: "cache_key" });
   if (error) throw new Error(error.message);

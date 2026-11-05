@@ -14,9 +14,9 @@ export const Route = createFileRoute("/api/prefetch")({
         const t0 = Date.now();
         try {
           const r = await retrieve(parsed.data.query, 5, request);
-          const { canShareAnswer, canonicalQuery, retrievalKey } = await import("@/lib/rag-cache");
+          const { retrievalKey } = await import("@/lib/rag-cache");
           const { makeEntry } = await import("@/server/rag-cache.server");
-          const entry = canShareAnswer(parsed.data.query, 0) ? makeEntry(retrievalKey(parsed.data.query), canonicalQuery(parsed.data.query), r.sources) : null;
+          const entry = makeEntry(retrievalKey(parsed.data.query), r.sources.map((s) => s.title).join(" | "), r.sources);
           return Response.json({ cache: r.debug.cache ?? "miss", ms: Date.now() - t0, entry, sources: r.sources.length, ids: r.sources.map((s) => s.id), titles: r.sources.map((s) => s.title), bridge: r.debug.bridge }, { headers: { "cache-control": "no-store" } });
         } catch (e) {
           console.error(e);

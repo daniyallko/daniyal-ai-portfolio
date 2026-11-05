@@ -34,18 +34,23 @@ export function canonicalQuery(raw: string): string {
   }
   const bridge = bridgeQuery(raw);
   const engine = normalizeCrossLingualRagQuery(raw);
+  const topic = /प्रोजेक्ट|परियोजना|proyectos?|projets?|projekte?|プロジェクト/iu.test(raw) ? "projects"
+    : /अनुभव|experiencia|expérience|erfahrung|経験/iu.test(raw) ? "experience"
+    : /कौशल|स्किल|habilidades|compétences|fähigkeiten|スキル/iu.test(raw) ? "skills" : null;
+  // Only an exact translated topic label is safe to collapse without a translator.
+  if (topic && queryWords(raw).length === 1) return topic;
   const tokens = [...new Set([...bridge.tokens, ...queryWords(engine.englishSearchQuery)])].sort();
   // Non-Latin qualifiers stay in the key: deterministic bridging isn't full translation.
   const qualifiers = queryWords(raw).filter((w) => /[^\x00-\x7f]/.test(w));
   return [...tokens, ...qualifiers].join(" ") || queryWords(raw).join(" ");
 }
 export function retrievalKey(raw: string, topK = 5): string {
-  return `${corpusVersion()}:r:${topK}:${canonicalQuery(raw)}`;
+  return `${corpusVersion()}:r:${topK}:${fingerprint(canonicalQuery(raw))}`;
 }
 export function answerKey(raw: string, promptVersion: string, lock?: string): string {
   const d = detectLanguage(raw);
   const lang = isLangCode(lock) ? lock : d.code;
-  return `${corpusVersion()}:a:${promptVersion}:${lang}:${d.script}:${d.isCodeSwitched}:${queryWords(raw).join(" ")}`;
+  return `${corpusVersion()}:a:${promptVersion}:${lang}:${d.script}:${d.isCodeSwitched}:${fingerprint(queryWords(raw).join(" "))}`;
 }
 /** Only public-vocabulary standalone questions can publish model output globally. */
 export function canShareAnswer(raw: string, historyLength: number): boolean {

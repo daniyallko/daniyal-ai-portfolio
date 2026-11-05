@@ -4,7 +4,7 @@ import { normalizeQueryKey } from "@/lib/voice-logic";
 import { bridgeQuery } from "@/lib/language";
 import { detectLanguageAndRegister, normalizeCrossLingualRagQuery } from "@/lib/multilingualVoiceEngine";
 import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
-import { canShareAnswer, canonicalQuery, retrievalKey } from "@/lib/rag-cache";
+import { retrievalKey } from "@/lib/rag-cache";
 import { makeEntry, readCache, remember, persistCache } from "@/server/rag-cache.server";
 import { defer } from "@/lib/background.server";
 
@@ -88,14 +88,14 @@ export async function retrieve(rawQuery: string, topK = 5, request?: Request): P
     } catch { warm.delete(key); }
   }
   const value = (async () => {
-    const shareable = canShareAnswer(rawQuery, 0);
-    const cached = shareable ? await readCache(key).catch(() => null) : null;
+    const cached = await readCache(key).catch(() => null);
     if (cached) {
       return { sources: cached.entry.sources, debug: { query, bridge, cache: cached.tier, candidates: [], timingsMs: { embed: 0, retrieve: Date.now() - now } } };
     }
     const result = await retrieveUncached(query, topK);
-    if (shareable && result.sources.length) {
-      const entry = makeEntry(key, canonicalQuery(rawQuery), result.sources);
+    if (result.sources.length) {
+      // Publish corpus text only, never transcripts or private query qualifiers.
+      const entry = makeEntry(key, result.sources.map((s) => s.title).join(" | "), result.sources);
       remember(entry);
       if (request) await defer(request, persistCache(entry, Date.now() - now));
       else await persistCache(entry, Date.now() - now).catch((error: unknown) => console.error("RAG persistence failed", error));
