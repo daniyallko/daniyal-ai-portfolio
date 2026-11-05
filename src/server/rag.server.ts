@@ -6,6 +6,7 @@ import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
 import { retrievalKey } from "@/lib/rag-cache";
 import { makeEntry, readCache, remember, persistCache } from "@/server/rag-cache.server";
 import { defer } from "@/lib/background.server";
+import { syncDocuments } from "@/server/kb-docs.server";
 
 const EMBED_MODEL = "google/gemini-embedding-2";
 
@@ -28,7 +29,7 @@ async function chunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> 
   corpusHot = { version, until: Date.now() + 5 * 60_000, value };
   try { return await value; } catch (error) { corpusHot = undefined; throw error; }
 }
-export async function warmCorpus() { await chunkEmbeddings(buildChunks()); }
+export async function warmCorpus(force = false) { await syncDocuments(force).catch(() => {}); await chunkEmbeddings(buildChunks()); }
 async function loadChunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.from("kb_embeddings").select("chunk_id, content_hash, embedding");
@@ -69,6 +70,7 @@ const warm = new Map<string, { at: number; value: Promise<{ sources: Source[]; d
 
 export async function retrieve(rawQuery: string, topK = 5, request?: Request): Promise<{ sources: Source[]; debug: RetrievalDebug & { cache?: string } }> {
   // Cross-lingual bridge: non-English queries gain canonical English search terms (deterministic, no LLM).
+  await syncDocuments().catch(() => {});
   const b = bridgeQuery(rawQuery);
   const isEnglish = detectLanguageAndRegister(rawQuery).langCode === "en";
   const n = isEnglish ? null : normalizeCrossLingualRagQuery(rawQuery);
