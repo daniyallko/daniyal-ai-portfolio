@@ -5,8 +5,8 @@ export const Route = createFileRoute("/api/public/rag-warm")({
     const { warmCorpus } = await import("@/server/rag.server");
     const { popularCache } = await import("@/server/rag-cache.server");
     try {
-      const [, entries] = await Promise.all([warmCorpus(), popularCache()]);
-      return Response.json({ entries }, { headers: { "cache-control": "no-store" } });
+      const [chunksLoaded, entries] = await Promise.all([warmCorpus(), popularCache()]);
+      return Response.json({ status: "warmed", chunksLoaded, entries, topCachedQueries: entries.length }, { headers: { "cache-control": "no-store" } });
     } catch {
       return Response.json({ entries: [], error: "Warm-up unavailable" }, { status: 503 });
     }
