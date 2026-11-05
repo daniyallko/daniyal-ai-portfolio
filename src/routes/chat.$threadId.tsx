@@ -209,6 +209,21 @@ function ThreadView({ threadId }: { threadId: string }) {
     });
   }, [threadId, visitorId]);
 
+  // Hand-off from the homepage command dock: send its question or start a live call once.
+  const pendingDone = useRef(false);
+  useEffect(() => {
+    if (loaded !== "ok" || pendingDone.current) return;
+    pendingDone.current = true;
+    const raw = sessionStorage.getItem("daniyal.pending.v1");
+    if (!raw) return;
+    sessionStorage.removeItem("daniyal.pending.v1");
+    try {
+      const p = JSON.parse(raw) as { q?: string; call?: boolean };
+      if (p.call) startCall();
+      else if (p.q) void send(p.q);
+    } catch { /* ignore */ }
+  }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, status]);
   useEffect(() => { if (status === "idle") taRef.current?.focus(); }, [status, loaded]);
 
