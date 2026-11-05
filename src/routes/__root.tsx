@@ -120,6 +120,9 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!window.location.pathname.startsWith("/admin") && !window.location.pathname.startsWith("/auth")) {
+      void import("@/lib/rag-browser").then(({ warmBrowser }) => warmBrowser());
+    }
     const path = window.location.pathname;
     if (path.startsWith("/admin") || path.startsWith("/auth")) return;
     void import("@/lib/visit.functions").then(async ({ trackVisit }) => {
