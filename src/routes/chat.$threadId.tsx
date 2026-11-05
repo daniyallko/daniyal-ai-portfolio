@@ -450,9 +450,9 @@ function ThreadView({ threadId }: { threadId: string }) {
               <AudioLines className="h-4 w-4" />
             </button>
             {status === "idle" ? (
-              <button type="submit" aria-label="Send" disabled={!input.trim()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
+              <button type="submit" aria-label="Send" disabled={!input.trim()} className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
             ) : (
-              <button type="button" aria-label="Stop" onClick={() => abortRef.current?.abort()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground"><Square className="h-3.5 w-3.5" /></button>
+              <button type="button" aria-label="Stop" onClick={() => abortRef.current?.abort()} className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground"><Square className="h-3.5 w-3.5" /></button>
             )}
           </div>
         </form>
