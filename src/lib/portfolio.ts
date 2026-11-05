@@ -143,6 +143,23 @@ export const education = {
 
 export type Chunk = { id: string; section: string; title: string; text: string };
 
+// Admin-added documents (loaded server-side from kb_documents) join the corpus here.
+let extraChunks: Chunk[] = [];
+export function setExtraChunks(chunks: Chunk[]) { extraChunks = chunks; }
+
+/** Split an admin document into ~900-char paragraph-aligned chunks. */
+export function chunkDocument(doc: { id: string; title: string; section: string; content: string }, max = 900): Chunk[] {
+  const paras = doc.content.replace(/\r/g, "").split(/\n\s*\n+/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const out: string[] = [];
+  let cur = "";
+  for (const p of paras.flatMap((p) => p.length > max ? p.match(new RegExp(`.{1,${max}}(\\s|$)`, "g")) ?? [p] : [p])) {
+    if (cur && cur.length + p.length + 1 > max) { out.push(cur); cur = ""; }
+    cur = cur ? `${cur} ${p.trim()}` : p.trim();
+  }
+  if (cur) out.push(cur);
+  return out.map((text, i) => ({ id: `doc-${doc.id.slice(0, 8)}-${i}`, section: doc.section, title: out.length > 1 ? `${doc.title} (${i + 1}/${out.length})` : doc.title, text }));
+}
+
 export function buildChunks(): Chunk[] {
   const chunks: Chunk[] = [
     { id: "profile", section: "Profile", title: `${profile.name} — ${profile.title}`, text: `${profile.summary} Specializes in ${profile.tagline}.` },
@@ -170,5 +187,5 @@ export function buildChunks(): Chunk[] {
   for (const s of skills) {
     chunks.push({ id: `skill-${s.group.toLowerCase().replace(/[^a-z]+/g, "-")}`, section: "Skills", title: s.group, text: `${s.group} skills: ${s.items.join(", ")}.` });
   }
-  return chunks;
+  return [...chunks, ...extraChunks];
 }

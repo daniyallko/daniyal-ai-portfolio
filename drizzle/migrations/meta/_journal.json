@@ -29,6 +29,13 @@
       "when": 1793872513178,
       "tag": "0003_rag_shared_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793873515830,
+      "tag": "0004_kb_documents",
+      "breakpoints": true
     }
   ]
 }
