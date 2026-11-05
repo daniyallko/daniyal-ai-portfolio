@@ -1,6 +1,10 @@
-# RAG cache upgrade
-- [x] Audit six cache systems and measure baseline latency.
-- [x] Add versioned shared retrieval/public-answer cache and bounded hot corpus cache.
-- [x] Add page warming, browser hydration, and typing/interim speculation.
-- [x] Integrate streamed answer reuse with isolated chat persistence and write-behind.
-- [x] Test cache safety/invalidation and verify browser flows and timings.
+# Roadmap
+
+- [ ] Frontend redesign (uploaded spec): obsidian/amber design system, homepage hero + unified command dock, hero→conversation transition, cursor glow, scroll reveals, CWV/safe-area — preserve ALL voice/RAG/multilingual/telemetry bindings
+  - [ ] Extract ThreadView into shared component (page + home variants)
+  - [ ] New design tokens + fonts + grain + reveal CSS
+  - [ ] AmbientCursorGlow
+  - [ ] Homepage rewrite (hero, dock, sections keep ?hl=/?skill= ids)
+  - [ ] Chat layout 100dvh + touch targets
+  - [ ] Update memory (visual style rule superseded)
+  - [ ] Tests + build log + Playwright verify
