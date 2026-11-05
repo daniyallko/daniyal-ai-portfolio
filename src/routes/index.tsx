@@ -1,5 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createThread, listThreads } from "@/lib/chat.functions";
+import { getVisitorId } from "@/lib/visitor";
+import type { ThreadControl } from "@/components/thread-view";
 import { ArrowUp, ArrowUpRight, AudioLines, Loader2, Mic, Square } from "lucide-react";
 import { profile, stats, experience, projects, skills, education } from "@/lib/portfolio";
 import { useTypewriter } from "@/lib/use-typewriter";
@@ -21,8 +24,65 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-/** Hand-off from the homepage dock to the chat thread (read once in the thread view). */
-export const PENDING_KEY = "daniyal.pending.v1";
+type Pending = { q?: string; call?: boolean };
+const loadThreadView = () => import("@/components/thread-view");
+const ThreadView = lazy(() => loadThreadView().then((m) => ({ default: m.ThreadView })));
+const AssistantCtx = createContext<(p?: Pending) => void>(() => {});
+
+/** Inline assistant: boots the thread view in the background so text and voice start instantly. */
+function useInlineAssistant() {
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const control = useRef<ThreadControl | null>(null);
+  const pending = useRef<Pending | null>(null);
+  const creating = useRef<Promise<string> | null>(null);
+
+  useEffect(() => {
+    const boot = () => {
+      void loadThreadView();
+      void fetch("/voice-worklets.js").catch(() => {});
+      listThreads({ data: { visitorId: getVisitorId() } }).then((t) => { if (t[0]) setThreadId((cur) => cur ?? t[0]!.id); }).catch(() => {});
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(boot); else setTimeout(boot, 200);
+  }, []);
+
+  const flush = useCallback(() => {
+    const c = control.current, p = pending.current;
+    if (!p || !c?.ready) return false;
+    pending.current = null;
+    if (p.call) c.startCall(); else if (p.q) c.send(p.q);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    const t = setInterval(() => { if (!pending.current || flush()) clearInterval(t); }, 40);
+    return () => { clearInterval(t); document.body.style.overflow = ""; };
+  }, [open, threadId, flush]);
+
+  const go = useCallback((p?: Pending) => {
+    pending.current = p ?? null;
+    setOpen(true);
+    if (flush()) return;
+    if (!threadId && !creating.current) {
+      creating.current = createThread({ data: { visitorId: getVisitorId() } }).then((t) => t.id);
+      creating.current.then((id) => setThreadId((cur) => cur ?? id)).catch(() => { creating.current = null; });
+    }
+  }, [threadId, flush]);
+
+  const node = threadId ? (
+    <div aria-hidden={!open} className={`fixed inset-0 z-50 bg-background transition-opacity duration-300 ${open ? "opacity-100" : "pointer-events-none invisible opacity-0"}`} style={{ height: "100dvh" }}>
+      <Suspense fallback={null}>
+        <ThreadView threadId={threadId} embed={{ active: open, onClose: () => setOpen(false), controlRef: control }} />
+      </Suspense>
+    </div>
+  ) : open ? (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background font-mono text-sm text-muted-foreground">booting assistant…</div>
+  ) : null;
+  return { go, node };
+}
 
 const PROMPTS = [
   "Ask anything about Daniyal's AI and engineering experience…",
@@ -86,7 +146,10 @@ function Index() {
   useReveal();
   const featured = projects.find((p) => p.featured)!;
   const others = projects.filter((p) => !p.featured);
+  const assistant = useInlineAssistant();
   return (
+    <AssistantCtx.Provider value={assistant.go}>
+    {assistant.node}
     <div className="relative min-h-[100dvh] overflow-x-clip">
       <header className="safe-top sticky top-0 z-30 border-b border-hairline bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 pb-3 text-sm sm:px-8">
@@ -98,7 +161,7 @@ function Index() {
             <a href="#work" className="hidden px-2 py-2 hover:text-foreground sm:inline">Work</a>
             <a href="#log" className="hidden px-2 py-2 hover:text-foreground sm:inline">Experience</a>
             <a href="#stack" className="hidden px-2 py-2 hover:text-foreground sm:inline">Stack</a>
-            <Link to="/chat" className="flex min-h-11 items-center rounded-full border border-hairline px-4 text-foreground transition-colors hover:border-primary hover:text-primary">Open assistant</Link>
+            <button type="button" onClick={() => assistant.go()} className="flex min-h-11 items-center rounded-full border border-hairline px-4 text-foreground transition-colors hover:border-primary hover:text-primary">Open assistant</button>
           </nav>
         </div>
       </header>
@@ -183,12 +246,12 @@ function Index() {
         </footer>
       </main>
     </div>
+    </AssistantCtx.Provider>
   );
 }
 
 function Hero() {
-  const navigate = useNavigate();
-  const [leaving, setLeaving] = useState(false);
+  const openAssistant = useContext(AssistantCtx);
   const [input, setInput] = useState("");
   const [focused, setFocused] = useState(false);
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
@@ -199,15 +262,8 @@ function Hero() {
   const speech = useSpeech({ voice: prefs.persona.ttsVoice, lang: prefs.lock });
   const typed = useTypewriter(PROMPTS, !input && !focused && rec === "idle");
 
-  const go = (pending: { q?: string; call?: boolean }) => {
-    if (leaving) return;
-    speech.stop();
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-    setLeaving(true);
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setTimeout(() => navigate({ to: "/chat" }), reduce ? 0 : 560);
-  };
-  const send = (text: string) => { if (text.trim()) go({ q: text.trim() }); };
+  const go = (pending: Pending) => { speech.stop(); openAssistant(pending); };
+  const send = (text: string) => { if (text.trim()) { go({ q: text.trim() }); setInput(""); } };
 
   const toggleDictation = async () => {
     setErr(null);
@@ -249,7 +305,7 @@ function Hero() {
   }, [input]);
 
   return (
-    <section className={`hero-exit flex min-h-[calc(100dvh-4.5rem)] flex-col items-center justify-center py-14 text-center ${leaving ? "leaving" : ""}`}>
+    <section className={`hero-exit flex min-h-[calc(100dvh-4.5rem)] flex-col items-center justify-center py-14 text-center`}>
       <p className="flex items-center gap-2 rounded-full border border-hairline bg-card/60 px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
         <span className="relative flex h-2 w-2"><span className="absolute inset-0 animate-ping rounded-full bg-signal opacity-60 motion-reduce:hidden" /><span className="relative h-2 w-2 rounded-full bg-signal" /></span>
         Available · {profile.location} · open to relocation
