@@ -121,6 +121,60 @@ export type Database = {
         }
         Relationships: []
       }
+      rag_query_cache: {
+        Row: {
+          cache_key: string
+          canonical_english_query: string
+          compute_saved_ms: number
+          corpus_version: string
+          created_at: string
+          expires_at: string
+          hit_count: number
+          id: string
+          lang_code: string
+          last_accessed_at: string
+          matched_chunk_ids: string[]
+          response_text: string
+          retrieved_context: string
+          sources: Json
+          tool_calls: Json
+        }
+        Insert: {
+          cache_key: string
+          canonical_english_query: string
+          compute_saved_ms?: number
+          corpus_version?: string
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          lang_code?: string
+          last_accessed_at?: string
+          matched_chunk_ids?: string[]
+          response_text?: string
+          retrieved_context: string
+          sources?: Json
+          tool_calls?: Json
+        }
+        Update: {
+          cache_key?: string
+          canonical_english_query?: string
+          compute_saved_ms?: number
+          corpus_version?: string
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          lang_code?: string
+          last_accessed_at?: string
+          matched_chunk_ids?: string[]
+          response_text?: string
+          retrieved_context?: string
+          sources?: Json
+          tool_calls?: Json
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -193,6 +247,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      touch_rag_cache: { Args: { _key: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin"
