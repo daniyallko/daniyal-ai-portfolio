@@ -468,6 +468,8 @@ export function bindLiveConnection(
   async function startSession(sdp: string) {
     if (closing || browser.readyState !== 1) return;
     clearTimeout(startTimer);
+    const { syncDocuments } = await import("@/server/kb-docs.server");
+    await syncDocuments().catch(() => {});
     const accepted = await connectLive(
       {
         type: "session.start",

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { adminGetThread, adminListVisitors, amIAdmin } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { AdminKb } from "@/components/admin-kb";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -26,6 +27,7 @@ function AdminPage() {
   const navigate = useNavigate();
   const role = useQuery({ queryKey: ["am-admin"], queryFn: () => amIAdmin() });
   const visitors = useQuery({ queryKey: ["admin-visitors"], queryFn: () => adminListVisitors(), enabled: !!role.data?.admin, refetchInterval: 30000 });
+  const [tab, setTab] = useState<"sessions" | "kb">("sessions");
   const [vid, setVid] = useState<string | null>(null);
   const [tid, setTid] = useState<string | null>(null);
   const msgs = useQuery({ queryKey: ["admin-thread", tid], queryFn: () => adminGetThread({ data: { threadId: tid! } }), enabled: !!tid });
@@ -50,10 +52,12 @@ function AdminPage() {
   return (
     <div className="flex h-screen flex-col bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3 font-mono text-xs">
-        <span><span className="text-primary">●</span> admin / sessions — {list.length} visitors</span>
+        <span className="flex gap-4"><span className="text-primary">●</span>
+          <button onClick={() => setTab("sessions")} className={tab === "sessions" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}>sessions ({list.length})</button>
+          <button onClick={() => setTab("kb")} className={tab === "kb" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}>knowledge base</button></span>
         <button onClick={signOut} className="text-muted-foreground hover:text-foreground">sign out</button>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-[300px_260px_1fr]">
+      {tab === "kb" ? <AdminKb /> : <div className="grid min-h-0 flex-1 grid-cols-[300px_260px_1fr]">
         <ul className="overflow-y-auto border-r border-border">
           {list.map((v) => (
             <li key={v.id}>
@@ -86,7 +90,7 @@ function AdminPage() {
             </div>
           )) : <p className="text-xs text-muted-foreground">Pick a chat.</p>}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
