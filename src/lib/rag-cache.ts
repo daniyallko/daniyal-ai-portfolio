@@ -25,6 +25,10 @@ const ALIASES: [RegExp, string][] = [
   [/^(?:skills|technical skills|tech stack)$/i, "skills"],
 ];
 export function canonicalQuery(raw: string): string {
+  const exactTopic = queryWords(raw).join(" ");
+  if (/^(projects?|प्रोजेक्ट्स?|परियोजना|proyectos?|projets?|projekte?|プロジェクト)$/iu.test(exactTopic)) return "projects";
+  if (/^(experience|अनुभव|experiencia|expérience|erfahrung|経験)$/iu.test(exactTopic)) return "experience";
+  if (/^(skills?|कौशल|स्किल|habilidades|compétences|fähigkeiten|スキル)$/iu.test(exactTopic)) return "skills";
   const detected = detectLanguage(raw);
   // Keep significant qualifiers and numbers. Never merge merely by shared topic.
   if (detected.code === "en") {

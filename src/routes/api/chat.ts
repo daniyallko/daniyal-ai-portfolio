@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/chat")({
         const { threadId, visitorId, message, lang } = parsed.data;
         const { answerKey, canShareAnswer, canonicalQuery, fingerprint } = await import("@/lib/rag-cache");
         const { makeEntry, readCache, remember, persistCache, touchCache } = await import("@/server/rag-cache.server");
-        const { defer } = await import("@/lib/background.server");
+        const { defer, drainDeferred } = await import("@/lib/background.server");
         const { detectActions } = await import("@/lib/voice-logic");
         const started = Date.now();
         const version = fingerprint(MODEL + SYSTEM);
@@ -113,6 +113,7 @@ export const Route = createFileRoute("/api/chat")({
               if (error) console.error("save assistant failed", error.message);
               await supabaseAdmin.from("chat_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
               await notified;
+              await drainDeferred(request);
               controller.close();
             }
           },
