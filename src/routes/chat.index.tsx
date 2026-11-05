@@ -5,6 +5,13 @@ import { getVisitorId } from "@/lib/visitor";
 
 export const Route = createFileRoute("/chat/")({
   ssr: false,
+  head: () => ({ meta: [
+    { title: "Start a Portfolio Chat — Mohd Daniyal" },
+    { name: "description", content: "Open your saved recruiter conversation with Mohd Daniyal’s portfolio assistant." },
+    { property: "og:title", content: "Start a Portfolio Chat — Mohd Daniyal" },
+    { property: "og:description", content: "Your private session for cited answers about Daniyal’s work." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
   component: ChatIndex,
 });
 

@@ -1,9 +1,11 @@
 import { generateEmbeddings } from "@lovable.dev/ai-gateway";
 import { buildChunks, type Chunk } from "@/lib/portfolio";
-import { normalizeQueryKey } from "@/lib/voice-logic";
 import { bridgeQuery } from "@/lib/language";
 import { detectLanguageAndRegister, normalizeCrossLingualRagQuery } from "@/lib/multilingualVoiceEngine";
 import { bm25Scores, cosine, hybridRank } from "@/lib/retrieval";
+import { retrievalKey } from "@/lib/rag-cache";
+import { makeEntry, readCache, remember, persistCache } from "@/server/rag-cache.server";
+import { defer } from "@/lib/background.server";
 
 const EMBED_MODEL = "google/gemini-embedding-2";
 
@@ -18,7 +20,16 @@ async function embed(texts: string[]): Promise<number[][]> {
   return (res as unknown as { data: { embedding: number[] }[] }).data.map((d) => d.embedding);
 }
 
+let corpusHot: { version: string; until: number; value: Promise<Map<string, number[]>> } | undefined;
 async function chunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> {
+  const version = hash(JSON.stringify(chunks));
+  if (corpusHot?.version === version && corpusHot.until > Date.now()) return corpusHot.value;
+  const value = loadChunkEmbeddings(chunks);
+  corpusHot = { version, until: Date.now() + 5 * 60_000, value };
+  try { return await value; } catch (error) { corpusHot = undefined; throw error; }
+}
+export async function warmCorpus() { await chunkEmbeddings(buildChunks()); }
+async function loadChunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.from("kb_embeddings").select("chunk_id, content_hash, embedding");
   if (error) throw new Error(error.message);
@@ -32,10 +43,14 @@ async function chunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> 
   }
   if (missing.length) {
     const vecs = await embed(missing.map((c) => `${c.title}\n${c.text}`));
-    const rows = missing.map((c, i) => ({ chunk_id: c.id, content_hash: hash(c.title + c.text), embedding: vecs[i]!, updated_at: new Date().toISOString() }));
+    const rows = missing.map((c, i) => {
+      const embedding = vecs[i];
+      if (!embedding) throw new Error("Missing corpus embedding");
+      return { chunk_id: c.id, content_hash: hash(c.title + c.text), embedding, updated_at: new Date().toISOString() };
+    });
     const { error: upErr } = await supabaseAdmin.from("kb_embeddings").upsert(rows);
     if (upErr) console.error("kb_embeddings upsert failed", upErr.message);
-    missing.forEach((c, i) => map.set(c.id, vecs[i]!));
+    missing.forEach((c, i) => { const vector = vecs[i]; if (vector) map.set(c.id, vector); });
   }
   return map;
 }
@@ -48,11 +63,11 @@ export type RetrievalDebug = {
   candidates: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
 };
 
-// Warm in-memory cache keyed by normalized query tokens (speculative prefetch + repeat questions).
+// Versioned query promises coalesce speculative prefetch + repeat questions per isolate.
 const CACHE_TTL = 5 * 60_000;
 const warm = new Map<string, { at: number; value: Promise<{ sources: Source[]; debug: RetrievalDebug }> }>();
 
-export async function retrieve(rawQuery: string, topK = 5): Promise<{ sources: Source[]; debug: RetrievalDebug & { cache?: "hit" | "miss" } }> {
+export async function retrieve(rawQuery: string, topK = 5, request?: Request): Promise<{ sources: Source[]; debug: RetrievalDebug & { cache?: string } }> {
   // Cross-lingual bridge: non-English queries gain canonical English search terms (deterministic, no LLM).
   const b = bridgeQuery(rawQuery);
   const isEnglish = detectLanguageAndRegister(rawQuery).langCode === "en";
@@ -61,7 +76,7 @@ export async function retrieve(rawQuery: string, topK = 5): Promise<{ sources: S
   const tokens = [...b.tokens, ...extra];
   const query = extra.length ? `${b.normalized} ${extra.join(" ")}` : b.normalized;
   const bridge = { raw: rawQuery, tokens, normalized: query, ms: +(b.ms + (n?.normalizationTimeMs ?? 0)).toFixed(2) };
-  const key = `${topK}:${normalizeQueryKey(query)}`;
+  const key = retrievalKey(rawQuery, topK);
   const now = Date.now();
   for (const [k, v] of warm) if (now - v.at > CACHE_TTL) warm.delete(k);
   const hit = warm.get(key);
@@ -71,12 +86,26 @@ export async function retrieve(rawQuery: string, topK = 5): Promise<{ sources: S
       return { sources: r.sources, debug: { ...r.debug, query, bridge, cache: "hit", timingsMs: { embed: 0, retrieve: Date.now() - now } } };
     } catch { warm.delete(key); }
   }
-  const value = retrieveUncached(query, topK);
+  const value = (async () => {
+    const cached = await readCache(key).catch(() => null);
+    if (cached) {
+      return { sources: cached.entry.sources, debug: { query, bridge, cache: cached.tier, candidates: [], timingsMs: { embed: 0, retrieve: Date.now() - now } } };
+    }
+    const result = await retrieveUncached(query, topK);
+    if (result.sources.length) {
+      // Publish corpus text only, never transcripts or private query qualifiers.
+      const entry = makeEntry(key, result.sources.map((s) => s.title).join(" | "), result.sources);
+      remember(entry);
+      if (request) await defer(request, persistCache(entry, Date.now() - now));
+      else await persistCache(entry, Date.now() - now).catch((error: unknown) => console.error("RAG persistence failed", error));
+    }
+    return result;
+  })();
   warm.set(key, { at: now, value });
   while (warm.size > 100) { const k = warm.keys().next().value; if (k === undefined) break; warm.delete(k); }
   try {
     const r = await value;
-    return { sources: r.sources, debug: { ...r.debug, bridge, cache: "miss" } };
+    return { sources: r.sources, debug: { ...r.debug, bridge, cache: "cache" in r.debug ? String(r.debug.cache) : "miss" } };
   } catch (e) { warm.delete(key); throw e; }
 }
 
@@ -84,7 +113,8 @@ async function retrieveUncached(query: string, topK: number): Promise<{ sources:
   const chunks = buildChunks();
   const t0 = Date.now();
   const [vecMap, [qv]] = await Promise.all([chunkEmbeddings(chunks), embed([query])]);
-  const qvec = qv!;
+   const qvec = qv;
+   if (!qvec) throw new Error("Missing query embedding");
   const t1 = Date.now();
   const dense = chunks.map((c) => cosine(qvec, vecMap.get(c.id) ?? []));
   const sparse = bm25Scores(query, chunks);
