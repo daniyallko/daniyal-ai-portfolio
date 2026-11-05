@@ -24,12 +24,12 @@ async function embed(texts: string[]): Promise<number[][]> {
 let corpusHot: { version: string; until: number; value: Promise<Map<string, number[]>> } | undefined;
 async function chunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> {
   const version = hash(JSON.stringify(chunks));
-  if (corpusHot?.version === version && corpusHot.until > Date.now()) return corpusHot.value;
+  if (corpusHot?.version === version && (corpusHot.until > Date.now() || corpusHot.version === version)) return corpusHot.value;
   const value = loadChunkEmbeddings(chunks);
   corpusHot = { version, until: Date.now() + 5 * 60_000, value };
   try { return await value; } catch (error) { corpusHot = undefined; throw error; }
 }
-export async function warmCorpus(force = false) { await syncDocuments(force).catch(() => {}); await chunkEmbeddings(buildChunks()); }
+export async function warmCorpus(force = false) { await syncDocuments(force).catch(() => {}); const chunks = buildChunks(); await chunkEmbeddings(chunks); return chunks.length; }
 async function loadChunkEmbeddings(chunks: Chunk[]): Promise<Map<string, number[]>> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.from("kb_embeddings").select("chunk_id, content_hash, embedding");

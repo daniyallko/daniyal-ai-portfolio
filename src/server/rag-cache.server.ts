@@ -3,7 +3,9 @@ import type { Database, Json } from "@/integrations/supabase/types";
 import { BoundedCache, CACHE_TTL, corpusVersion, type CacheEntry } from "@/lib/rag-cache";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const hot = new BoundedCache<CacheEntry>();
+// L2 isolate RAM: survives across requests on a warm server, capped at 500 entries.
+const g = globalThis as typeof globalThis & { __EDGE_RAG_L2__?: BoundedCache<CacheEntry> };
+const hot = (g.__EDGE_RAG_L2__ ??= new BoundedCache<CacheEntry>(500));
 function publicClient() {
   const key = process.env['SUPABASE_PUBLISHABLE_KEY'];
   const url = process.env['SUPABASE_URL'];
@@ -54,7 +56,7 @@ export async function touchCache(key: string) {
   if (error) throw new Error(error.message);
 }
 export async function popularCache(): Promise<CacheEntry[]> {
-  const { data, error } = await publicClient().from("rag_query_cache").select("*").eq("corpus_version", corpusVersion()).gt("expires_at", new Date().toISOString()).order("hit_count", { ascending: false }).limit(20);
+  const { data, error } = await publicClient().from("rag_query_cache").select("*").eq("corpus_version", corpusVersion()).gt("expires_at", new Date().toISOString()).order("hit_count", { ascending: false }).limit(50);
   if (error) { console.error("Cache hydration failed", error.message); return []; }
   return (data ?? []).flatMap((row) => { const entry = fromRow(row); if (!entry) return []; remember(entry); return [entry]; });
 }
