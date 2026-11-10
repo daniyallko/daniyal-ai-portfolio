@@ -94,5 +94,5 @@ export function AmbientCritters() {
     return () => { cancelAnimationFrame(raf); obs.disconnect(); window.removeEventListener("resize", resize); };
   }, []);
 
-  return <canvas ref={ref} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[1] h-full w-full" />;
+  return <canvas ref={ref} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[60] h-full w-full" />;
 }
