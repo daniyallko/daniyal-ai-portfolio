@@ -575,6 +575,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
                     `preview:${p.id}`,
                     previewLine(activeLang ?? "en", p.gender === "female"),
                     { voice: p.ttsVoice, lang: activeLang ?? "en" },
+                    { src: `/voice-previews/${p.id}-${activeLang ?? "en"}.mp3` },
                   );
               }}
             />

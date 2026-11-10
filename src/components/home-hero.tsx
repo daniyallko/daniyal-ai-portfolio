@@ -255,6 +255,7 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
                       `preview:${p.id}`,
                       previewLine(prefs.lock ?? "en", p.gender === "female"),
                       { voice: p.ttsVoice, lang: prefs.lock ?? "en" },
+                      { src: `/voice-previews/${p.id}-${prefs.lock ?? "en"}.mp3` },
                     )
                   }
                 />
