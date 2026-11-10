@@ -854,6 +854,15 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
                       ))}
                     </div>
                   )}
+                  {captions.some((c) => /\b(resume|résumé|cv|curriculum)\b/i.test(c.text)) && (
+                    <a
+                      href="/api/public/resume"
+                      download
+                      className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-sm border border-primary px-3 font-mono text-xs text-signal transition-colors hover:bg-primary hover:text-primary-foreground"
+                    >
+                      ↓ Download resume
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
