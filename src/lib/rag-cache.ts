@@ -4,8 +4,14 @@ import { normalizeCrossLingualRagQuery } from "@/lib/multilingualVoiceEngine";
 
 export type CacheSource = { n: number; id: string; section: string; title: string; text: string };
 export type CacheEntry = {
-  key: string; query: string; version: string; lang: string;
-  sources: CacheSource[]; text: string; tools: unknown[]; expiresAt: number;
+  key: string;
+  query: string;
+  version: string;
+  lang: string;
+  sources: CacheSource[];
+  text: string;
+  tools: unknown[];
+  expiresAt: number;
 };
 export const CACHE_LIMIT = 100;
 export const CACHE_TTL = 7 * 24 * 60 * 60_000;
@@ -21,18 +27,36 @@ export function fingerprint(text: string): string {
 export function corpusVersion(): string {
   return fingerprint(JSON.stringify(buildChunks()));
 }
-export const queryWords = (text: string) => text.normalize("NFKC").toLowerCase().match(/[\p{L}\p{M}\p{N}+#]+/gu) ?? [];
-const GRAMMAR = new Set("a an the is are was were do does did has have he his him daniyal what which who tell me about of in on and to can you with for any please show list describe summarize explain portfolio work built projects project experience skills skill stack production systems system".split(" "));
+export const queryWords = (text: string) =>
+  text
+    .normalize("NFKC")
+    .toLowerCase()
+    .match(/[\p{L}\p{M}\p{N}+#]+/gu) ?? [];
+const GRAMMAR = new Set(
+  "a an the is are was were do does did has have he his him daniyal what which who tell me about of in on and to can you with for any please show list describe summarize explain portfolio work built projects project experience skills skill stack production systems system".split(
+    " ",
+  ),
+);
 const ALIASES: [RegExp, string][] = [
-  [/^(?:what|which|tell me about|show me|list|describe)?\s*(?:are |is |his |daniyal s |the |your )*(?:projects|project)\s*(?:has he built|has daniyal built)?$/i, "projects"],
+  [
+    /^(?:what|which|tell me about|show me|list|describe)?\s*(?:are |is |his |daniyal s |the |your )*(?:projects|project)\s*(?:has he built|has daniyal built)?$/i,
+    "projects",
+  ],
   [/^(?:experience|work experience|career|roles)$/i, "experience"],
   [/^(?:skills|technical skills|tech stack)$/i, "skills"],
 ];
 export function canonicalQuery(raw: string): string {
   const exactTopic = queryWords(raw).join(" ");
-  if (/^(projects?|प्रोजेक्ट्स?|परियोजना|proyectos?|projets?|projekte?|プロジェクト)$/iu.test(exactTopic)) return "projects";
-  if (/^(experience|अनुभव|experiencia|expérience|erfahrung|経験)$/iu.test(exactTopic)) return "experience";
-  if (/^(skills?|कौशल|स्किल|habilidades|compétences|fähigkeiten|スキル)$/iu.test(exactTopic)) return "skills";
+  if (
+    /^(projects?|प्रोजेक्ट्स?|परियोजना|proyectos?|projets?|projekte?|プロジェクト)$/iu.test(
+      exactTopic,
+    )
+  )
+    return "projects";
+  if (/^(experience|अनुभव|experiencia|expérience|erfahrung|経験)$/iu.test(exactTopic))
+    return "experience";
+  if (/^(skills?|कौशल|स्किल|habilidades|compétences|fähigkeiten|スキル)$/iu.test(exactTopic))
+    return "skills";
   const detected = detectLanguage(raw);
   // Keep significant qualifiers and numbers. Never merge merely by shared topic.
   if (detected.code === "en") {
@@ -42,14 +66,18 @@ export function canonicalQuery(raw: string): string {
   }
   const bridge = bridgeQuery(raw);
   const engine = normalizeCrossLingualRagQuery(raw);
-  const topic = /प्रोजेक्ट|परियोजना|proyectos?|projets?|projekte?|プロジェクト/iu.test(raw) ? "projects"
-    : /अनुभव|experiencia|expérience|erfahrung|経験/iu.test(raw) ? "experience"
-    : /कौशल|स्किल|habilidades|compétences|fähigkeiten|スキル/iu.test(raw) ? "skills" : null;
+  const topic = /प्रोजेक्ट|परियोजना|proyectos?|projets?|projekte?|プロジェクト/iu.test(raw)
+    ? "projects"
+    : /अनुभव|experiencia|expérience|erfahrung|経験/iu.test(raw)
+      ? "experience"
+      : /कौशल|स्किल|habilidades|compétences|fähigkeiten|スキル/iu.test(raw)
+        ? "skills"
+        : null;
   // Only an exact translated topic label is safe to collapse without a translator.
   if (topic && queryWords(raw).length === 1) return topic;
   const tokens = [...new Set([...bridge.tokens, ...queryWords(engine.englishSearchQuery)])].sort();
   // Non-Latin qualifiers stay in the key: deterministic bridging isn't full translation.
-  const qualifiers = queryWords(raw).filter((w) => /[^\x00-\x7f]/.test(w));
+  const qualifiers = queryWords(raw).filter((w) => /[^\p{ASCII}]/u.test(w));
   return [...tokens, ...qualifiers].join(" ") || queryWords(raw).join(" ");
 }
 export function retrievalKey(raw: string, topK = 5): string {
@@ -62,10 +90,27 @@ export function answerKey(raw: string, promptVersion: string, lock?: string): st
 }
 /** Only public-vocabulary standalone questions can publish model output globally. */
 export function canShareAnswer(raw: string, historyLength: number): boolean {
-  if (historyLength !== 0 || raw.length > 240 || /[@\d]|https?:|\b(my|i|we|our|previous|above|that|instead|ignore|not|never|salary|offer|candidate)\b/i.test(raw)) return false;
+  if (
+    historyLength !== 0 ||
+    raw.length > 240 ||
+    /[@\d]|https?:|\b(my|i|we|our|previous|above|that|instead|ignore|not|never|salary|offer|candidate)\b/i.test(
+      raw,
+    )
+  )
+    return false;
   const words = queryWords(raw);
-  const publicWords = new Set(queryWords(buildChunks().map((c) => `${c.title} ${c.text}`).join(" ")));
-  return words.length > 0 && words.length <= 40 && words.every((w) => GRAMMAR.has(w) || publicWords.has(w));
+  const publicWords = new Set(
+    queryWords(
+      buildChunks()
+        .map((c) => `${c.title} ${c.text}`)
+        .join(" "),
+    ),
+  );
+  return (
+    words.length > 0 &&
+    words.length <= 40 &&
+    words.every((w) => GRAMMAR.has(w) || publicWords.has(w))
+  );
 }
 export class BoundedCache<T> {
   private entries = new Map<string, { value: T; expiresAt: number }>();
@@ -73,12 +118,17 @@ export class BoundedCache<T> {
   get(key: string, now = Date.now()): T | undefined {
     const entry = this.entries.get(key);
     if (!entry) return;
-    if (entry.expiresAt <= now) { this.entries.delete(key); return; }
-    this.entries.delete(key); this.entries.set(key, entry);
+    if (entry.expiresAt <= now) {
+      this.entries.delete(key);
+      return;
+    }
+    this.entries.delete(key);
+    this.entries.set(key, entry);
     return entry.value;
   }
   set(key: string, value: T, expiresAt: number) {
-    this.entries.delete(key); this.entries.set(key, { value, expiresAt });
+    this.entries.delete(key);
+    this.entries.set(key, { value, expiresAt });
     while (this.entries.size > this.limit) {
       const first = this.entries.keys().next().value;
       if (first === undefined) break;

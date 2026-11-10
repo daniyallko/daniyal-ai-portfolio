@@ -23,7 +23,17 @@ export function speakableText(md: string): string {
   t = t.replace(/^\s*[-*+]\s+/gm, "");
   t = t.replace(/^\s*\d+[.)]\s+/gm, "");
   t = t.replace(/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/gm, " ");
-  t = t.replace(/^\s*\|(.*)\|\s*$/gm, (_m, row: string) => " " + row.split("|").map((c) => c.trim()).filter(Boolean).join(", ") + ".");
+  t = t.replace(
+    /^\s*\|(.*)\|\s*$/gm,
+    (_m, row: string) =>
+      " " +
+      row
+        .split("|")
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .join(", ") +
+      ".",
+  );
   t = t.replace(/^\s*[-*_]{3,}\s*$/gm, " ");
   t = t.replace(/\*\*([^*]+)\*\*/g, "$1");
   t = t.replace(/__([^_]+)__/g, "$1");
@@ -32,7 +42,10 @@ export function speakableText(md: string): string {
   // Symbols a voice would skip or misread.
   t = t.replace(/→/g, " to ").replace(/←/g, " from ").replace(/·/g, ", ").replace(/—|–/g, ", ");
   t = t.replace(/&/g, " and ");
-  t = t.replace(/(\d)([MB])\b/g, (_m, n: string, s: string) => `${n} ${s === "M" ? "million" : "billion"}`);
+  t = t.replace(
+    /(\d)([MB])\b/g,
+    (_m, n: string, s: string) => `${n} ${s === "M" ? "million" : "billion"}`,
+  );
   t = t.replace(/(\d)K\b/g, "$1 thousand");
   t = t.replace(/(\d)x\b/g, "$1 times");
   t = t.replace(/\s+/g, " ").trim();
@@ -47,7 +60,10 @@ export function trimForSpeech(t: string, limit = MAX_SPEAK_CHARS): string {
   const slice = t.slice(0, limit);
   const ends = [". ", "! ", "? "].map((p) => slice.lastIndexOf(p));
   const cut = Math.max(...ends);
-  const out = cut > limit * 0.4 ? slice.slice(0, cut + 1) : slice.slice(0, Math.max(slice.lastIndexOf(" "), 1));
+  const out =
+    cut > limit * 0.4
+      ? slice.slice(0, cut + 1)
+      : slice.slice(0, Math.max(slice.lastIndexOf(" "), 1));
   return out.trim();
 }
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { bridgeQuery, detectLanguage, fillerFor, polyglotFirstClause, splitSentences } from "./language";
+import {
+  bridgeQuery,
+  detectLanguage,
+  fillerFor,
+  polyglotFirstClause,
+  splitSentences,
+} from "./language";
 import { endpointSilenceMs, normalizeQueryKey } from "./voice-logic";
 import { getPersona, VOICE_PERSONAS } from "@/config/voicePersonas";
 
@@ -9,12 +15,22 @@ describe("detectLanguage", () => {
     expect(d).toMatchObject({ code: "hi", script: "Devanagari", isCodeSwitched: true });
   });
   it("detects romanized Hinglish", () => {
-    expect(detectLanguage("unhone kya projects kiye hai aur kaise kaam karte hai")).toMatchObject({ code: "hi", script: "Latin", isCodeSwitched: true });
+    expect(detectLanguage("unhone kya projects kiye hai aur kaise kaam karte hai")).toMatchObject({
+      code: "hi",
+      script: "Latin",
+      isCodeSwitched: true,
+    });
   });
   it("detects Spanish, French, German, Portuguese, Japanese, Arabic and English", () => {
-    expect(detectLanguage("¿Qué proyectos tiene Daniyal y cómo es su experiencia?").code).toBe("es");
-    expect(detectLanguage("Quels sont les projets de Daniyal et son expérience avec les agents ?").code).toBe("fr");
-    expect(detectLanguage("Welche Projekte hat er und was ist seine Erfahrung mit RAG?").code).toBe("de");
+    expect(detectLanguage("¿Qué proyectos tiene Daniyal y cómo es su experiencia?").code).toBe(
+      "es",
+    );
+    expect(
+      detectLanguage("Quels sont les projets de Daniyal et son expérience avec les agents ?").code,
+    ).toBe("fr");
+    expect(detectLanguage("Welche Projekte hat er und was ist seine Erfahrung mit RAG?").code).toBe(
+      "de",
+    );
     expect(detectLanguage("Quais projetos ele tem e qual a experiência dele?").code).toBe("pt");
     expect(detectLanguage("Daniyalのプロジェクトについて教えてください").code).toBe("ja");
     expect(detectLanguage("ما هي مشاريع دانيال؟").code).toBe("ar");
@@ -38,17 +54,23 @@ describe("bridgeQuery", () => {
 
 describe("polyglotFirstClause", () => {
   it("flushes on the Hindi poorna viram", () => {
-    const r = polyglotFirstClause("Daniyal ने AI BotKit पर काम किया। उन्होंने Kubernetes पर licensing platform चलाया और 99.9% uptime रखा।");
+    const r = polyglotFirstClause(
+      "Daniyal ने AI BotKit पर काम किया। उन्होंने Kubernetes पर licensing platform चलाया और 99.9% uptime रखा।",
+    );
     expect(r.delimiter).toBe("।");
     expect(r.first).toBe("Daniyal ने AI BotKit पर काम किया।");
   });
   it("flushes on the CJK full stop", () => {
-    const r = polyglotFirstClause("DaniyalはAI BotKitの中核部分を構築しました。千以上のサイトで稼働しているマルチチャネルのRAGチャットボットです。");
+    const r = polyglotFirstClause(
+      "DaniyalはAI BotKitの中核部分を構築しました。千以上のサイトで稼働しているマルチチャネルのRAGチャットボットです。",
+    );
     expect(r.delimiter).toBe("。");
     expect(r.first.endsWith("。")).toBe(true);
   });
   it("flushes on an Arabic comma within 5-8 words", () => {
-    const r = polyglotFirstClause("بنى دانيال منصة للدردشة الذكية، وهي تعمل على أكثر من ألف موقع حول العالم اليوم");
+    const r = polyglotFirstClause(
+      "بنى دانيال منصة للدردشة الذكية، وهي تعمل على أكثر من ألف موقع حول العالم اليوم",
+    );
     expect(r.delimiter).toBe("،");
   });
   it("splits sentences across scripts", () => {

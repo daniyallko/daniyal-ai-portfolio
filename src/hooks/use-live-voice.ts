@@ -41,10 +41,29 @@ export const VOICE_MAX_MS = 5 * 60_000;
 
 function newTelemetry(): VoiceTelemetry {
   return {
-    sessionId: crypto.randomUUID(), turnId: 0, micRms: 0, zcr: 0, vad: "silence", silenceMs: 0, onsetDetectMs: null,
-    bufferMs: 0, outRms: 0, underruns: 0, playedMs: 0, assistantSpeaking: false, ducked: false, bargeIns: 0,
-    lastBargeCutMs: null, ttfaMs: null, connectedAt: null, lastActivity: Date.now(), maxMs: VOICE_MAX_MS,
-    idleMs: VOICE_IDLE_MS, worklet: false, micAnalyser: null, outAnalyser: null,
+    sessionId: crypto.randomUUID(),
+    turnId: 0,
+    micRms: 0,
+    zcr: 0,
+    vad: "silence",
+    silenceMs: 0,
+    onsetDetectMs: null,
+    bufferMs: 0,
+    outRms: 0,
+    underruns: 0,
+    playedMs: 0,
+    assistantSpeaking: false,
+    ducked: false,
+    bargeIns: 0,
+    lastBargeCutMs: null,
+    ttfaMs: null,
+    connectedAt: null,
+    lastActivity: Date.now(),
+    maxMs: VOICE_MAX_MS,
+    idleMs: VOICE_IDLE_MS,
+    worklet: false,
+    micAnalyser: null,
+    outAnalyser: null,
   };
 }
 
@@ -135,9 +154,15 @@ export function useLiveVoice(
             endReason: event.reason === "idle" || event.reason === "budget" ? event.reason : null,
           }));
         } else if (event.type === "app.playback.blocked" || event.type === "app.playback.resumed") {
-          setCall((previous) => ({ ...previous, playbackBlocked: event.type === "app.playback.blocked" }));
+          setCall((previous) => ({
+            ...previous,
+            playbackBlocked: event.type === "app.playback.blocked",
+          }));
         } else if (["app.error", "gateway.error", "error"].includes(event.type)) {
-          setCall((previous) => ({ ...previous, error: event.error?.message ?? "Voice request failed." }));
+          setCall((previous) => ({
+            ...previous,
+            error: event.error?.message ?? "Voice request failed.",
+          }));
         }
         try {
           void Promise.resolve(latest.current.onEvent?.(event)).catch(() => {
@@ -160,7 +185,8 @@ export function useLiveVoice(
     if (controller.current?.setMuted(muted)) setCall((previous) => ({ ...previous, muted }));
   }, []);
   const setOutputMuted = useCallback((on: boolean) => {
-    if (controller.current?.setOutputMuted(on)) setCall((previous) => ({ ...previous, outputMuted: on }));
+    if (controller.current?.setOutputMuted(on))
+      setCall((previous) => ({ ...previous, outputMuted: on }));
   }, []);
   const resumePlayback = useCallback(() => {
     void controller.current?.resumePlayback();
@@ -225,7 +251,13 @@ function createLiveVoice(options: LiveOptions) {
     options.onEvent({ type: "app.barge_in", turnId: tel.turnId, playedMs: tel.playedMs });
   }
 
-  function onPlayerLevel(d: { rms: number; inRms: number; fillMs: number; underruns: number; playedMs: number }) {
+  function onPlayerLevel(d: {
+    rms: number;
+    inRms: number;
+    fillMs: number;
+    underruns: number;
+    playedMs: number;
+  }) {
     const now = performance.now();
     tel.outRms = d.rms;
     tel.bufferMs = d.fillMs;
@@ -235,7 +267,10 @@ function createLiveVoice(options: LiveOptions) {
     tel.assistantSpeaking = now - lastOutAt < 250;
     if (d.rms > 0.01) {
       tel.lastActivity = Date.now();
-      if (userEndAt !== null) { tel.ttfaMs = Math.round(now - userEndAt); userEndAt = null; }
+      if (userEndAt !== null) {
+        tel.ttfaMs = Math.round(now - userEndAt);
+        userEndAt = null;
+      }
     }
     if (tel.ducked) {
       const sinceBarge = now - bargeAt;
@@ -257,10 +292,16 @@ function createLiveVoice(options: LiveOptions) {
       src.connect(vad);
       tel.micAnalyser = an;
       vad.port.onmessage = ({ data }) => {
-        if (data.type === "onset") { tel.vad = "speech"; onVadOnset(data.detectMs); }
-        else if (data.type === "offset") { tel.vad = "silence"; userEndAt = performance.now(); }
-        else if (data.type === "level") {
-          tel.micRms = data.rms; tel.zcr = data.zcr; tel.silenceMs = Math.round(data.silentMs);
+        if (data.type === "onset") {
+          tel.vad = "speech";
+          onVadOnset(data.detectMs);
+        } else if (data.type === "offset") {
+          tel.vad = "silence";
+          userEndAt = performance.now();
+        } else if (data.type === "level") {
+          tel.micRms = data.rms;
+          tel.zcr = data.zcr;
+          tel.silenceMs = Math.round(data.silentMs);
           if (data.speaking) tel.lastActivity = Date.now();
         }
       };
@@ -279,7 +320,9 @@ function createLiveVoice(options: LiveOptions) {
       const an = ctx.createAnalyser();
       an.fftSize = 512;
       src.connect(node).connect(an).connect(ctx.destination);
-      node.port.onmessage = ({ data }) => { if (data.type === "level") onPlayerLevel(data); };
+      node.port.onmessage = ({ data }) => {
+        if (data.type === "level") onPlayerLevel(data);
+      };
       node.port.postMessage({ type: "mute", on: outputMuted });
       player = node;
       tel.outAnalyser = an;
@@ -364,9 +407,11 @@ function createLiveVoice(options: LiveOptions) {
     try {
       await options.audio.play();
       await ctx?.resume();
-      if (state === "starting" || state === "active") options.onEvent({ type: "app.playback.resumed" });
+      if (state === "starting" || state === "active")
+        options.onEvent({ type: "app.playback.resumed" });
     } catch {
-      if (state === "starting" || state === "active") options.onEvent({ type: "app.playback.blocked" });
+      if (state === "starting" || state === "active")
+        options.onEvent({ type: "app.playback.blocked" });
     }
   }
 
@@ -388,7 +433,10 @@ function createLiveVoice(options: LiveOptions) {
     };
     options.onEvent({
       type: "app.error",
-      error: { message: messages[reason ?? ""] ?? "The voice call ended unexpectedly. Start a new call to retry." },
+      error: {
+        message:
+          messages[reason ?? ""] ?? "The voice call ended unexpectedly. Start a new call to retry.",
+      },
     });
   }
 
@@ -401,8 +449,14 @@ function createLiveVoice(options: LiveOptions) {
     if (Date.now() - lastAck >= 5000) return fail("Voice control connection lost");
     if (Date.now() - lastHeartbeat >= 5000) return fail("Voice media connection lost");
     const nowMs = Date.now();
-    if (tel.connectedAt && nowMs - tel.connectedAt >= tel.maxMs) { endReason = "budget"; return stop(); }
-    if (nowMs - tel.lastActivity >= tel.idleMs) { endReason = "idle"; return stop(); }
+    if (tel.connectedAt && nowMs - tel.connectedAt >= tel.maxMs) {
+      endReason = "budget";
+      return stop();
+    }
+    if (nowMs - tel.lastActivity >= tel.idleMs) {
+      endReason = "idle";
+      return stop();
+    }
     if (!mediaReady()) return;
     try {
       send({ type: "gateway.heartbeat" });
@@ -478,7 +532,13 @@ function createLiveVoice(options: LiveOptions) {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 24000 },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 24000,
+        },
       });
       microphone = stream;
       if (!starting()) {
@@ -506,7 +566,8 @@ function createLiveVoice(options: LiveOptions) {
         });
       });
       connection.addEventListener("connectionstatechange", () => {
-        if (connection.connectionState === "failed") fail("Voice media connection failed. Start a new call to retry.");
+        if (connection.connectionState === "failed")
+          fail("Voice media connection failed. Start a new call to retry.");
         else if (connection.connectionState === "closed") fail("Voice media connection closed");
         else activate();
       });
@@ -573,7 +634,10 @@ function createLiveVoice(options: LiveOptions) {
       socket.onerror = () => fail("Voice connection failed");
       socket.onclose = () => {
         if (state !== "stopping" && state !== "closed") {
-          options.onEvent({ type: "app.error", error: { message: "Voice control connection closed" } });
+          options.onEvent({
+            type: "app.error",
+            error: { message: "Voice control connection closed" },
+          });
         }
         release();
       };

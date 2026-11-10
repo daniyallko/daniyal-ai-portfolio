@@ -2,7 +2,11 @@
 // Reciprocal Rank Fusion. No I/O so it is unit-testable.
 import type { Chunk } from "./portfolio";
 
-const STOP = new Set("a an the and or of to in on for with at by is are was were be has have had do does did what which who how his her he she it its this that as from about any can you me tell".split(" "));
+const STOP = new Set(
+  "a an the and or of to in on for with at by is are was were be has have had do does did what which who how his her he she it its this that as from about any can you me tell".split(
+    " ",
+  ),
+);
 
 export function tokenize(s: string): string[] {
   return s
@@ -33,25 +37,47 @@ export function bm25Scores(query: string, chunks: Chunk[], k1 = 1.4, b = 0.75): 
 }
 
 export function cosine(a: number[], b: number[]): number {
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) { const x = a[i]!, y = b[i] ?? 0; dot += x * y; na += x * x; nb += y * y; }
+  let dot = 0,
+    na = 0,
+    nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]!,
+      y = b[i] ?? 0;
+    dot += x * y;
+    na += x * x;
+    nb += y * y;
+  }
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
 }
 
 function ranks(scores: number[]): number[] {
   const order = scores.map((s, i) => [s, i] as const).sort((x, y) => y[0] - x[0]);
   const r = new Array(scores.length).fill(Infinity);
-  order.forEach(([s, i], pos) => { if (s > 0) r[i] = pos + 1; });
+  order.forEach(([s, i], pos) => {
+    if (s > 0) r[i] = pos + 1;
+  });
   return r;
 }
 
-export type Scored = { chunk: Chunk; bm25: number; dense: number; bm25Rank: number; denseRank: number; rrf: number };
+export type Scored = {
+  chunk: Chunk;
+  bm25: number;
+  dense: number;
+  bm25Rank: number;
+  denseRank: number;
+  rrf: number;
+};
 
 export function hybridRank(chunks: Chunk[], bm25: number[], dense: number[], k = 60): Scored[] {
-  const br = ranks(bm25), dr = ranks(dense);
+  const br = ranks(bm25),
+    dr = ranks(dense);
   return chunks
     .map((chunk, i) => ({
-      chunk, bm25: bm25[i]!, dense: dense[i]!, bm25Rank: br[i]!, denseRank: dr[i]!,
+      chunk,
+      bm25: bm25[i]!,
+      dense: dense[i]!,
+      bm25Rank: br[i]!,
+      denseRank: dr[i]!,
       rrf: (isFinite(br[i]!) ? 1 / (k + br[i]!) : 0) + (isFinite(dr[i]!) ? 1 / (k + dr[i]!) : 0),
     }))
     .sort((a, b) => b.rrf - a.rrf);

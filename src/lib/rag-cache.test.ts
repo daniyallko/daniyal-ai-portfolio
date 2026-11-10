@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { answerKey, BoundedCache, canShareAnswer, canonicalQuery, corpusVersion, retrievalKey } from "./rag-cache";
+import {
+  answerKey,
+  BoundedCache,
+  canShareAnswer,
+  canonicalQuery,
+  corpusVersion,
+  retrievalKey,
+} from "./rag-cache";
 
 describe("public RAG cache rules", () => {
   it("never publishes contextual answers", () => {
@@ -12,7 +19,9 @@ describe("public RAG cache rules", () => {
   });
   it("separates response script and language", () => {
     expect(answerKey("projects", "prompt", "en")).not.toBe(answerKey("projects", "prompt", "hi"));
-    expect(answerKey("प्रोजेक्ट्स", "prompt")).not.toBe(answerKey("Mujhe projects bataiye", "prompt"));
+    expect(answerKey("प्रोजेक्ट्स", "prompt")).not.toBe(
+      answerKey("Mujhe projects bataiye", "prompt"),
+    );
   });
   it("shares exact multilingual topic labels for retrieval", () => {
     expect(retrievalKey("projects")).toBe(retrievalKey("प्रोजेक्ट्स"));
@@ -32,7 +41,9 @@ describe("public RAG cache rules", () => {
     const cache = new BoundedCache<string>(2);
     cache.set("one", "first", 100);
     expect(cache.get("one", 100)).toBeUndefined();
-    cache.set("a", "A", 1000); cache.set("b", "B", 1000); cache.set("c", "C", 1000);
+    cache.set("a", "A", 1000);
+    cache.set("b", "B", 1000);
+    cache.set("c", "C", 1000);
     expect(cache.get("a", 0)).toBeUndefined();
     expect(cache.get("c", 0)).toBe("C");
   });
