@@ -14,6 +14,7 @@ import {
 import { adminGetThread, adminListVisitors, amIAdmin } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminKb } from "@/components/admin-kb";
+import { AdminResume } from "@/components/admin-resume";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -67,7 +68,7 @@ function AdminPage() {
     enabled: !!role.data?.admin,
     refetchInterval: 30000,
   });
-  const [tab, setTab] = useState<"sessions" | "kb">("sessions");
+  const [tab, setTab] = useState<"sessions" | "kb" | "resume">("sessions");
   const [vid, setVid] = useState<string | null>(null);
   const [tid, setTid] = useState<string | null>(null);
   const msgs = useQuery({
@@ -180,6 +181,15 @@ function AdminPage() {
               <Database className="h-4 w-4" aria-hidden="true" />
               Knowledge base
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "resume"}
+              onClick={() => setTab("resume")}
+              className={`inline-flex min-h-12 cursor-pointer items-center gap-2 border-b-2 px-3 font-mono text-[11px] transition-colors ${tab === "resume" ? "border-signal text-signal" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              Resume
+            </button>
           </div>
           <span className="hidden items-center gap-2 pb-4 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground md:flex">
             <ShieldCheck className="h-3.5 w-3.5 text-signal" aria-hidden="true" />
@@ -188,7 +198,11 @@ function AdminPage() {
         </div>
       </header>
 
-      {tab === "kb" ? (
+      {tab === "resume" ? (
+        <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
+          <AdminResume />
+        </div>
+      ) : tab === "kb" ? (
         <div id="admin-kb-panel" role="tabpanel" className="flex min-h-0 flex-1 flex-col">
           <AdminKb />
         </div>

@@ -36,6 +36,13 @@
       "when": 1793873515830,
       "tag": "0004_kb_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794320825788,
+      "tag": "0005_resume_admin_policies",
+      "breakpoints": true
     }
   ]
 }
