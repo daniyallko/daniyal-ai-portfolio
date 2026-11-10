@@ -2,6 +2,7 @@ import process from "node:process";
 import { buildChunks } from "./portfolio";
 import { CHAT_SYSTEM } from "./prompt";
 import { retrieve } from "../server/rag.server";
+import { syncDocuments } from "../server/kb-docs.server";
 import { GUARDRAIL } from "./voice-logic";
 import { getPersona, type VoicePersona } from "../config/voicePersonas";
 import { LANGUAGES, LANGUAGE_RULE, fillerFor, isLangCode, type LangCode } from "./language";
@@ -529,7 +530,7 @@ export function bindLiveConnection(
   async function startSession(sdp: string) {
     if (closing || browser.readyState !== 1) return;
     clearTimeout(startTimer);
-    const { syncDocuments } = await import("@/server/kb-docs.server");
+
     await syncDocuments().catch(() => {});
     const accepted = await connectLive(
       {

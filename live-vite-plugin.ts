@@ -72,6 +72,17 @@ export function liveVoiceDev(): Plugin {
       // Some dev runtimes don't expose ssrLoadModule; fall back to a native import of the relay.
       let relayPromise: Promise<typeof import("./src/lib/live-relay.server")> | undefined;
       const loadRelay = async (): Promise<typeof import("./src/lib/live-relay.server")> => {
+        // Prefer the dev server's long-lived SSR runner: runnerImport closes its runner after
+        // loading, which breaks the relay's later lazy imports ("module runner has been closed").
+        const env = (server as unknown as { environments?: Record<string, { runner?: { import: (id: string) => Promise<unknown> } }> }).environments;
+        const runner = env?.["ssr"]?.runner;
+        if (runner) {
+          try {
+            return (await runner.import("/src/lib/live-relay.server.ts")) as typeof import("./src/lib/live-relay.server");
+          } catch (e) {
+            console.warn("ssr runner import failed", e);
+          }
+        }
         try {
           return (await server.ssrLoadModule(
             "/src/lib/live-relay.server.ts",
