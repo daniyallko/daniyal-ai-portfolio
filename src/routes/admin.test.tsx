@@ -20,9 +20,15 @@ vi.mock("@/lib/admin.functions", () => ({
   adminListVisitors: mocks.adminListVisitors,
   adminGetThread: mocks.adminGetThread,
 }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { signOut: mocks.signOut } } }));
-vi.mock("@/components/admin-kb", () => ({ AdminKb: () => <section aria-label="Knowledge base editor">Knowledge base editor</section> }));
-vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => <button type="button">Theme</button> }));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { auth: { signOut: mocks.signOut } },
+}));
+vi.mock("@/components/admin-kb", () => ({
+  AdminKb: () => <section aria-label="Knowledge base editor">Knowledge base editor</section>,
+}));
+vi.mock("@/components/theme-toggle", () => ({
+  ThemeToggle: () => <button type="button">Theme</button>,
+}));
 
 const AdminPage = Route.options.component!;
 const visitor = {
@@ -38,20 +44,38 @@ const visitor = {
   language: "en-IN",
   landing_path: "/",
   threads: [
-    { id: "thread-first", title: "Production RAG architecture", updated_at: "2026-11-09T09:00:00Z" },
+    {
+      id: "thread-first",
+      title: "Production RAG architecture",
+      updated_at: "2026-11-09T09:00:00Z",
+    },
     { id: "thread-second", title: "Voice systems", updated_at: "2026-11-09T08:00:00Z" },
   ],
 };
 
 function renderAdmin() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><AdminPage /></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <AdminPage />
+    </QueryClientProvider>,
+  );
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.signOut.mockResolvedValue({});
-  mocks.adminGetThread.mockImplementation(({ data }: { data: { threadId: string } }) => Promise.resolve([{ id: `message-${data.threadId}`, role: "assistant", content: `Answer from ${data.threadId}`, created_at: "2026-11-09T09:30:00Z", voice: false }]));
+  mocks.adminGetThread.mockImplementation(({ data }: { data: { threadId: string } }) =>
+    Promise.resolve([
+      {
+        id: `message-${data.threadId}`,
+        role: "assistant",
+        content: `Answer from ${data.threadId}`,
+        created_at: "2026-11-09T09:30:00Z",
+        voice: false,
+      },
+    ]),
+  );
 });
 
 describe("AdminPage", () => {
@@ -84,12 +108,16 @@ describe("AdminPage", () => {
     fireEvent.click(sessions);
 
     fireEvent.click(await screen.findByRole("button", { name: /Visitor abcd1234/ }));
-    await waitFor(() => expect(mocks.adminGetThread).toHaveBeenCalledWith({ data: { threadId: "thread-first" } }));
+    await waitFor(() =>
+      expect(mocks.adminGetThread).toHaveBeenCalledWith({ data: { threadId: "thread-first" } }),
+    );
     expect(await screen.findByText("Answer from thread-first")).toBeInTheDocument();
     expect(screen.getByText(/Fixture browser with a deliberately long/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Voice systems" }));
-    await waitFor(() => expect(mocks.adminGetThread).toHaveBeenCalledWith({ data: { threadId: "thread-second" } }));
+    await waitFor(() =>
+      expect(mocks.adminGetThread).toHaveBeenCalledWith({ data: { threadId: "thread-second" } }),
+    );
     expect(await screen.findByText("Answer from thread-second")).toBeInTheDocument();
   });
 

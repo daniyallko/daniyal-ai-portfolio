@@ -36,6 +36,10 @@ export function citationStats(answer: string, sourceCount: number) {
 }
 
 /** Overall quality: facts 50%, citation coverage 30%, no invalid citations 20%. */
-export function qualityScore(facts: number, citeCoverage: number, invalidCitations: number): number {
+export function qualityScore(
+  facts: number,
+  citeCoverage: number,
+  invalidCitations: number,
+): number {
   return 0.5 * facts + 0.3 * citeCoverage + 0.2 * (invalidCitations === 0 ? 1 : 0);
 }

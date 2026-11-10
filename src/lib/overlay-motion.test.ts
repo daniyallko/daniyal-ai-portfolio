@@ -10,7 +10,10 @@ describe("overlayDurationMs", () => {
     expect(overlayDurationMs(entry, false)).toBe(duration);
   });
 
-  it.each(["message", "empty", "voice"] as const)("disables %s interpolation under reduced motion", (entry) => {
-    expect(overlayDurationMs(entry, true)).toBe(0);
-  });
+  it.each(["message", "empty", "voice"] as const)(
+    "disables %s interpolation under reduced motion",
+    (entry) => {
+      expect(overlayDurationMs(entry, true)).toBe(0);
+    },
+  );
 });

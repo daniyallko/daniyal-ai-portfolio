@@ -7,7 +7,10 @@ import { useEffect, useState } from "react";
 export function useTypewriter(phrases: readonly string[], enabled: boolean): string {
   const [text, setText] = useState("");
   useEffect(() => {
-    if (!enabled || phrases.length === 0) { setText(""); return; }
+    if (!enabled || phrases.length === 0) {
+      setText("");
+      return;
+    }
     let phrase = 0;
     let char = 0;
     let deleting = false;
@@ -17,7 +20,11 @@ export function useTypewriter(phrases: readonly string[], enabled: boolean): str
       if (!deleting) {
         char += 1;
         setText(p.slice(0, char));
-        if (char >= p.length) { deleting = true; timer = window.setTimeout(tick, 2400); return; }
+        if (char >= p.length) {
+          deleting = true;
+          timer = window.setTimeout(tick, 2400);
+          return;
+        }
         timer = window.setTimeout(tick, 30 + Math.random() * 42);
       } else {
         char -= 2;

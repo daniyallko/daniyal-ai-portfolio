@@ -12,13 +12,42 @@ const FOCUSABLE = [
 
 export function getFocusable(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => {
-    if (el.matches(":disabled") || el.tabIndex < 0 || el.closest("[hidden], [inert], [aria-hidden='true']")) return false;
-    for (let node: HTMLElement | null = el; node && node !== container.parentElement; node = node.parentElement) {
+    if (
+      el.matches(":disabled") ||
+      el.tabIndex < 0 ||
+      el.closest("[hidden], [inert], [aria-hidden='true']")
+    )
+      return false;
+    for (
+      let node: HTMLElement | null = el;
+      node && node !== container.parentElement;
+      node = node.parentElement
+    ) {
       const style = window.getComputedStyle(node);
       if (style.display === "none" || style.visibility === "hidden") return false;
     }
     return true;
   });
+}
+
+export function isolateBackground(container: HTMLElement): () => void {
+  const changed: { element: HTMLElement; wasInert: boolean }[] = [];
+  let current: HTMLElement = container;
+  while (current.parentElement) {
+    const parent: HTMLElement = current.parentElement;
+    for (const sibling of Array.from(parent.children)) {
+      if (sibling === current || !(sibling instanceof HTMLElement)) continue;
+      changed.push({ element: sibling, wasInert: sibling.hasAttribute("inert") });
+      sibling.setAttribute("inert", "");
+    }
+    if (parent === document.body) break;
+    current = parent;
+  }
+  return () => {
+    for (const { element, wasInert } of changed) {
+      if (!wasInert) element.removeAttribute("inert");
+    }
+  };
 }
 
 export function wrapTabFocus(event: KeyboardEvent, container: HTMLElement): void {
@@ -29,7 +58,11 @@ export function wrapTabFocus(event: KeyboardEvent, container: HTMLElement): void
   const last = items[items.length - 1]!;
   const active = document.activeElement;
   const outside = !container.contains(active);
-  if ((event.shiftKey && (active === first || outside)) || (!event.shiftKey && active === last) || outside) {
+  if (
+    (event.shiftKey && (active === first || outside)) ||
+    (!event.shiftKey && active === last) ||
+    outside
+  ) {
     event.preventDefault();
     (event.shiftKey ? last : first).focus();
   }

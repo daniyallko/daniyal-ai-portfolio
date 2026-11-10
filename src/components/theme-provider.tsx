@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { resolveTheme, THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
 
 type ThemeContextValue = { theme: Theme; setTheme: (theme: Theme) => void };
@@ -7,7 +16,9 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 function applyTheme(theme: Theme) {
   document.documentElement.dataset["theme"] = theme;
   document.documentElement.style.colorScheme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0B0C0C" : "#F2F0E9");
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", theme === "dark" ? "#0B0C0C" : "#F2F0E9");
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -18,11 +29,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       stored = window.localStorage.getItem(THEME_STORAGE_KEY);
       explicit.current = stored === "light" || stored === "dark";
-    } catch { /* Storage can be unavailable in privacy modes. */ }
+    } catch {
+      /* Storage can be unavailable in privacy modes. */
+    }
     return resolveTheme(stored, window.matchMedia("(prefers-color-scheme: dark)").matches);
   });
 
-  useEffect(() => { applyTheme(theme); }, [theme]);
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -35,7 +50,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((next: Theme) => {
     explicit.current = true;
-    try { window.localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* Keep the in-memory choice. */ }
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch {
+      /* Keep the in-memory choice. */
+    }
     setThemeState(next);
   }, []);
 

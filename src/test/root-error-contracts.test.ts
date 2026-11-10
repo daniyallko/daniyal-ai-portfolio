@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({ invalidate: vi.fn(), reset: vi.fn(), report: v
 
 vi.mock("@tanstack/react-router", () => ({
   createRootRouteWithContext: () => (options: unknown) => ({ options }),
-  Link: ({ children, to, ...props }: { children: ReactNode; to: string }) => h("a", { href: to, ...props }, children),
+  Link: ({ children, to, ...props }: { children: ReactNode; to: string }) =>
+    h("a", { href: to, ...props }, children),
   useRouter: () => ({ invalidate: mocks.invalidate }),
   Outlet: () => null,
   HeadContent: () => null,
@@ -15,8 +16,12 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/lib/lovable-error-reporting", () => ({ reportLovableError: mocks.report }));
 vi.mock("@/components/ambient-cursor-glow", () => ({ AmbientCursorGlow: () => null }));
-vi.mock("@/components/theme-provider", () => ({ ThemeProvider: ({ children }: { children: ReactNode }) => children }));
-vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => h("button", { type: "button" }, "Theme") }));
+vi.mock("@/components/theme-provider", () => ({
+  ThemeProvider: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock("@/components/theme-toggle", () => ({
+  ThemeToggle: () => h("button", { type: "button" }, "Theme"),
+}));
 
 const NotFound = Route.options.notFoundComponent!;
 const RootError = Route.options.errorComponent;

@@ -4,7 +4,11 @@ it("flushes write-behind tasks without blocking active output", async () => {
   const request = new Request("http://localhost/cache");
   let resolve: (() => void) | undefined;
   let written = false;
-  const task = new Promise<void>((done) => { resolve = done; }).then(() => { written = true; });
+  const task = new Promise<void>((done) => {
+    resolve = done;
+  }).then(() => {
+    written = true;
+  });
   await defer(request, task);
   expect(written).toBe(false);
   resolve?.();

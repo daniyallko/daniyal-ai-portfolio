@@ -53,7 +53,12 @@ export function useSpeech(config: SpeechVoice) {
   }, []);
 
   const speak = useCallback(
-    async (key: string, text: string, override?: Override, opts: { force?: boolean; prepared?: boolean } = {}) => {
+    async (
+      key: string,
+      text: string,
+      override?: Override,
+      opts: { force?: boolean; prepared?: boolean } = {},
+    ) => {
       if (idRef.current === key && !opts.force) {
         stop();
         return;
@@ -72,16 +77,27 @@ export function useSpeech(config: SpeechVoice) {
       const fc = polyglotFirstClause(opts.prepared ? text : prepareForSpeech(text));
       const { first, rest } = fc;
       if (!opts.force) setDelimiter(fc.delimiter);
-      lastRef.current = { key, segments: rest ? [first, rest] : [first], ...(override ? { override } : {}) };
+      lastRef.current = {
+        key,
+        segments: rest ? [first, rest] : [first],
+        ...(override ? { override } : {}),
+      };
       segRef.current = 0;
       const fetchWav = async (part: string) => {
         const res = await fetch("/api/speak", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: part, voice: override?.voice ?? configRef.current.voice, lang: override?.lang ?? configRef.current.lang }),
+          body: JSON.stringify({
+            text: part,
+            voice: override?.voice ?? configRef.current.voice,
+            lang: override?.lang ?? configRef.current.lang,
+          }),
           signal: ac.signal,
         });
-        if (ttfbRef.current === null) { ttfbRef.current = Math.round(performance.now() - t0); setTtfbMs(ttfbRef.current); }
+        if (ttfbRef.current === null) {
+          ttfbRef.current = Math.round(performance.now() - t0);
+          setTtfbMs(ttfbRef.current);
+        }
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(j.error ?? "Could not generate audio");
@@ -99,7 +115,10 @@ export function useSpeech(config: SpeechVoice) {
           audio.onerror = () => reject(new Error("Playback failed"));
           audio.play().then(() => {
             if (token !== tokenRef.current) return;
-            if (ttfaRef.current === null) { ttfaRef.current = Math.round(performance.now() - t0); setTtfaMs(ttfaRef.current); }
+            if (ttfaRef.current === null) {
+              ttfaRef.current = Math.round(performance.now() - t0);
+              setTtfaMs(ttfaRef.current);
+            }
             setState("playing");
           }, reject);
         });
@@ -121,7 +140,8 @@ export function useSpeech(config: SpeechVoice) {
         }
         if (token === tokenRef.current) stop();
       } catch (e) {
-        if (ac.signal.aborted || (e as Error).name === "AbortError" || token !== tokenRef.current) return;
+        if (ac.signal.aborted || (e as Error).name === "AbortError" || token !== tokenRef.current)
+          return;
         setError((e as Error).message || "Could not generate audio");
         stop();
       }
@@ -143,5 +163,17 @@ export function useSpeech(config: SpeechVoice) {
     return true;
   }, [speak]);
 
-  return { id, state, error, ttfaMs, ttfbMs, delimiter, swaps, speak, stop, hotSwap, clearError: () => setError(null) };
+  return {
+    id,
+    state,
+    error,
+    ttfaMs,
+    ttfbMs,
+    delimiter,
+    swaps,
+    speak,
+    stop,
+    hotSwap,
+    clearError: () => setError(null),
+  };
 }

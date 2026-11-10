@@ -27,7 +27,10 @@ export type LiveConfig = {
 };
 
 // Fill the literal model slugs from co-loaded knowledge before typechecking.
-const liveSettings = { liveModel: "openai/gpt-live-1", backendModel: "openai/gpt-6-astra" } as const;
+const liveSettings = {
+  liveModel: "openai/gpt-live-1",
+  backendModel: "openai/gpt-6-astra",
+} as const;
 
 export type LiveSocket = {
   readonly readyState: number;
@@ -63,8 +66,7 @@ export function getLiveConfig(url?: string): LiveConfig {
     persona,
     lang,
     key: process.env["LOVABLE_API_KEY"] ?? "",
-    openingInstructions:
-      `In ${lang ? LANGUAGES[lang].name : "English"}, greet the caller in one short sentence as Daniyal's portfolio voice assistant, then ask what they'd like to know about his experience or projects. Then listen.`,
+    openingInstructions: `In ${lang ? LANGUAGES[lang].name : "English"}, greet the caller in one short sentence as Daniyal's portfolio voice assistant, then ask what they'd like to know about his experience or projects. Then listen.`,
   };
   if ([config.key, config.liveModel, config.backendModel].some((value) => !value)) {
     throw new Error("Missing Live relay configuration");
@@ -72,7 +74,10 @@ export function getLiveConfig(url?: string): LiveConfig {
   return config;
 }
 
-export function validateLiveUpgrade(request: Request, options: { allowMissingOrigin?: boolean } = {}): Response | null {
+export function validateLiveUpgrade(
+  request: Request,
+  options: { allowMissingOrigin?: boolean } = {},
+): Response | null {
   const origin = request.headers.get("origin");
   if (origin === null ? !options.allowMissingOrigin : origin !== new URL(request.url).origin) {
     return new Response("Voice connection origin rejected", { status: 403 });
@@ -111,8 +116,12 @@ export function handleLiveRequest(request: Request): Response {
 
 function conversationInstructions(config: LiveConfig) {
   const female = config.persona.gender === "female";
-  const fillers = (["en", "hi", "es", "fr", "de"] as const).map((l) => `${LANGUAGES[l].name}: "${fillerFor(l, female)}"`).join("; ");
-  const profile = buildChunks().map((c) => `- (${c.section}) ${c.title}: ${c.text}`).join("\n");
+  const fillers = (["en", "hi", "es", "fr", "de"] as const)
+    .map((l) => `${LANGUAGES[l].name}: "${fillerFor(l, female)}"`)
+    .join("; ");
+  const profile = buildChunks()
+    .map((c) => `- (${c.section}) ${c.title}: ${c.text}`)
+    .join("\n");
   return `You are the voice assistant on Mohd Daniyal's portfolio, talking with recruiters and hiring managers.
 ${config.lang ? `Always speak ${LANGUAGES[config.lang].name}.` : "Detect the language the user speaks (including Hinglish and other code-switched mixes) and answer in that same language and register; start in English."}
 You speak as the "${config.persona.name}" persona (${config.persona.tagline}).
@@ -142,23 +151,53 @@ async function answerQuestion(
 ) {
   signal.throwIfAborted();
   consumeInput();
-  const lastUser = [...messages].reverse().slice(0, 6).filter((m) => "role" in m && m.role === "user").map((m) => ("content" in m && typeof m.content === "string" ? m.content : "")).reverse().join(" ");
+  const lastUser = [...messages]
+    .reverse()
+    .slice(0, 6)
+    .filter((m) => "role" in m && m.role === "user")
+    .map((m) => ("content" in m && typeof m.content === "string" ? m.content : ""))
+    .reverse()
+    .join(" ");
   const { sources } = await retrieve(lastUser || "Daniyal experience");
-  const ctx = sources.map((s) => `[${s.n}] (${s.section}) ${s.title}\n${s.text}`).join("\n\n") || "(no relevant sources)";
+  const ctx =
+    sources.map((s) => `[${s.n}] (${s.section}) ${s.title}\n${s.text}`).join("\n\n") ||
+    "(no relevant sources)";
   const stream = await streamResponse(
     {
       model: config.backendModel,
-      input: [...messages, { role: "user", content: `SOURCES:\n${ctx}\n\nAnswer the latest user question for a spoken reply.` }],
-      instructions: CHAT_SYSTEM + "\nThis answer will be spoken aloud: no markdown, no citation numbers, at most 70 words. Answer in the language the user spoke, keeping technical terms in English. Use the latest correction if transcripts were revised.",
+      input: [
+        ...messages,
+        {
+          role: "user",
+          content: `SOURCES:\n${ctx}\n\nAnswer the latest user question for a spoken reply.`,
+        },
+      ],
+      instructions:
+        CHAT_SYSTEM +
+        "\nThis answer will be spoken aloud: no markdown, no citation numbers, at most 70 words. Answer in the language the user spoke, keeping technical terms in English. Use the latest correction if transcripts were revised.",
       reasoning: { effort: "low" },
     },
-    { apiKey: config.key, signal, maxRetries: 0, runId: correlation.runID, metadata: { live_session_id: correlation.sessionID, delegation_id: correlation.delegationID } },
+    {
+      apiKey: config.key,
+      signal,
+      maxRetries: 0,
+      runId: correlation.runID,
+      metadata: { live_session_id: correlation.sessionID, delegation_id: correlation.delegationID },
+    },
   );
   let completed: ResponsesResponse | undefined;
-  for await (const event of stream) if (event.type === "response.completed") completed = event.response;
+  for await (const event of stream)
+    if (event.type === "response.completed") completed = event.response;
   signal.throwIfAborted();
-  if (!completed || completed.status !== "completed") throw new Error("The backend response did not complete");
-  const answer = completed.output.flatMap((item) => (item.type === "message" ? item.content.flatMap((part) => (part.type === "output_text" ? [part.text] : [])) : [])).join("\n");
+  if (!completed || completed.status !== "completed")
+    throw new Error("The backend response did not complete");
+  const answer = completed.output
+    .flatMap((item) =>
+      item.type === "message"
+        ? item.content.flatMap((part) => (part.type === "output_text" ? [part.text] : []))
+        : [],
+    )
+    .join("\n");
   if (!answer.trim()) throw new Error("The backend response had no answer");
   messages.push({ role: "assistant", content: answer });
   return answer;
@@ -258,13 +297,19 @@ export function bindLiveConnection(
     if (!content || !browserReady || !sessionID || greetingRequested || closing) return;
     greetingRequested = true;
     if (new TextEncoder().encode(content).length > 480) {
-      emit({ type: "app.greeting.error", error: { message: "The opening instructions are too long" } });
+      emit({
+        type: "app.greeting.error",
+        error: { message: "The opening instructions are too long" },
+      });
       return;
     }
     greetingCommand = { id: crypto.randomUUID(), type: "instructions" };
     greetingTimer = setTimeout(() => {
       clearGreeting();
-      emit({ type: "app.greeting.error", error: { message: "The opening could not be confirmed" } });
+      emit({
+        type: "app.greeting.error",
+        error: { message: "The opening could not be confirmed" },
+      });
     }, 10_000);
     sendGateway({
       type: "session.instructions.append",
@@ -357,7 +402,7 @@ export function bindLiveConnection(
           backendMessages.push(...updates.map(({ role, text }) => ({ role, content: text })));
           transcriptCursor = transcripts.length;
           taskRevision = revision;
-        }
+        },
       );
       if (closing || controller.signal.aborted) return;
       if (taskRevision !== revision) return;
@@ -370,7 +415,10 @@ export function bindLiveConnection(
           "The backend attempt failed. Completed tool results remain valid; verify uncertain external actions before any retry.",
       });
       if (taskRevision !== revision) return;
-      deliverResult(id, "The backend could not finish the answer. Ask whether the user wants to try again.");
+      deliverResult(
+        id,
+        "The backend could not finish the answer. Ask whether the user wants to try again.",
+      );
     } finally {
       if (task === controller) task = undefined;
       scheduleDelegation();
@@ -413,11 +461,21 @@ export function bindLiveConnection(
           clearGreeting();
           emit({ type: "app.greeting.accepted" });
         }
-      } else if (greetingCommand && event.type === "error" && event.error?.client_event_id === greetingCommand.id) {
+      } else if (
+        greetingCommand &&
+        event.type === "error" &&
+        event.error?.client_event_id === greetingCommand.id
+      ) {
         clearGreeting();
-        emit({ type: "app.greeting.error", error: { message: event.error.message ?? "The opening was rejected" } });
+        emit({
+          type: "app.greeting.error",
+          error: { message: event.error.message ?? "The opening was rejected" },
+        });
       }
-      if (event.type === "session.input_transcript.delta" || event.type === "session.output_transcript.delta") {
+      if (
+        event.type === "session.input_transcript.delta" ||
+        event.type === "session.output_transcript.delta"
+      ) {
         const role = event.type === "session.input_transcript.delta" ? "user" : "assistant";
         if (!event.delta?.trim()) return;
         const listeningSound = role === "user" && Boolean(task) && isListeningSound(event.delta);
@@ -448,7 +506,10 @@ export function bindLiveConnection(
             completedDelegation = undefined;
           }
           if (pendingDelegations.length) {
-            emit({ type: "app.delegation.pending", delegation_id: pendingDelegations[0]?.event.delegation?.id });
+            emit({
+              type: "app.delegation.pending",
+              delegation_id: pendingDelegations[0]?.event.delegation?.id,
+            });
           }
         }
         scheduleDelegation();
@@ -493,7 +554,8 @@ export function bindLiveConnection(
         try {
           for await (const event of accepted) receiveGateway(event);
         } catch {
-          if (!closing) emit({ type: "app.error", error: { message: "Voice gateway connection failed" } });
+          if (!closing)
+            emit({ type: "app.error", error: { message: "Voice gateway connection failed" } });
         } finally {
           finish();
         }
@@ -503,12 +565,18 @@ export function bindLiveConnection(
 
   browser.onMessage((data) => {
     try {
-      if (typeof data !== "string" || data.length > 64 * 1024) throw new Error("Invalid client message");
+      if (typeof data !== "string" || data.length > 64 * 1024)
+        throw new Error("Invalid client message");
       const event = JSON.parse(data);
       if (event.type === "session.close") return stop();
       if (closing) return;
       if (!gateway) {
-        if (starting || event.type !== "app.start" || typeof event.sdp !== "string" || !event.sdp.trim()) {
+        if (
+          starting ||
+          event.type !== "app.start" ||
+          typeof event.sdp !== "string" ||
+          !event.sdp.trim()
+        ) {
           throw new Error("Voice startup message required");
         }
         starting = true;
@@ -534,7 +602,10 @@ export function bindLiveConnection(
       }
       sendGateway({ type: "gateway.heartbeat" });
     } catch {
-      emit({ type: "app.error", error: { message: "Voice connection could not be started or continued" } });
+      emit({
+        type: "app.error",
+        error: { message: "Voice connection could not be started or continued" },
+      });
       stop();
     }
   });

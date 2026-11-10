@@ -1,4 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import type { AssistantRequest } from "@/components/home-hero";
 import type { ThreadControl } from "@/components/thread-view";
 import { createThread, listThreads } from "@/lib/chat.functions";
@@ -83,28 +92,36 @@ export function useInlineAssistant(): {
 
   const ensureThread = useCallback(() => {
     if (threadId) return;
-    void initialize().then(() => {
-      setError(null);
-    }).catch(() => {
-      setError("Couldn't open the assistant. Check your connection and try again.");
-    });
+    void initialize()
+      .then(() => {
+        setError(null);
+      })
+      .catch(() => {
+        setError("Couldn't open the assistant. Check your connection and try again.");
+      });
   }, [threadId, initialize]);
 
-  const go = useCallback((request?: AssistantRequest) => {
-    pending.current = request ?? null;
-    trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setEntry(request?.call ? "voice" : request?.q ? "message" : "empty");
-    setError(null);
-    setOpen(true);
-    if (flush()) return;
-    ensureThread();
-  }, [ensureThread, flush]);
+  const go = useCallback(
+    (request?: AssistantRequest) => {
+      pending.current = request ?? null;
+      trigger.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setEntry(request?.call ? "voice" : request?.q ? "message" : "empty");
+      setError(null);
+      setOpen(true);
+      if (flush()) return;
+      ensureThread();
+    },
+    [ensureThread, flush],
+  );
 
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     if (!open) return;
-    const interval = setInterval(() => { if (!pending.current || flush()) clearInterval(interval); }, 40);
+    const interval = setInterval(() => {
+      if (!pending.current || flush()) clearInterval(interval);
+    }, 40);
     return () => clearInterval(interval);
   }, [open, threadId, flush]);
 
@@ -114,7 +131,8 @@ export function useInlineAssistant(): {
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        const sourceDialog = event.target instanceof Element ? event.target.closest('[role="dialog"]') : null;
+        const sourceDialog =
+          event.target instanceof Element ? event.target.closest('[role="dialog"]') : null;
         if (sourceDialog && sourceDialog !== overlay.current) return;
         if (overlay.current?.querySelector('[role="dialog"]')) return;
         event.preventDefault();
@@ -134,7 +152,9 @@ export function useInlineAssistant(): {
   useEffect(() => {
     if (!open || !overlay.current || overlay.current.contains(document.activeElement)) return;
     const frame = requestAnimationFrame(() => {
-      const target = overlay.current?.querySelector<HTMLElement>("button:not(:disabled), textarea, a[href]");
+      const target = overlay.current?.querySelector<HTMLElement>(
+        "button:not(:disabled), textarea, a[href]",
+      );
       target?.focus();
     });
     return () => cancelAnimationFrame(frame);
@@ -142,43 +162,70 @@ export function useInlineAssistant(): {
 
   const loading = (
     <div className="assistant-boot" role="status">
-      <span className="assistant-boot__mark" aria-hidden>d</span>
+      <span className="assistant-boot__mark" aria-hidden>
+        d
+      </span>
       <p>Opening assistant…</p>
-      <button type="button" onClick={close}>Close</button>
+      <button type="button" onClick={close}>
+        Close
+      </button>
     </div>
   );
   const failure = (
     <div className="assistant-boot" role="alert">
-      <span className="assistant-boot__mark" aria-hidden>d</span>
+      <span className="assistant-boot__mark" aria-hidden>
+        d
+      </span>
       <h2>Assistant unavailable</h2>
       <p>{error}</p>
       <div className="flex gap-2">
-        <button type="button" className="assistant-boot__primary" onClick={() => { setError(null); if (!flush()) ensureThread(); }}>Retry</button>
-        <button type="button" onClick={close}>Close</button>
+        <button
+          type="button"
+          className="assistant-boot__primary"
+          onClick={() => {
+            setError(null);
+            if (!flush()) ensureThread();
+          }}
+        >
+          Retry
+        </button>
+        <button type="button" onClick={close}>
+          Close
+        </button>
       </div>
     </div>
   );
 
-  const node = (threadId || open || error) ? (
-    <div
-      ref={overlay}
-      role="dialog"
-      aria-modal={open ? true : undefined}
-      aria-label="Daniyal's AI assistant"
-      aria-hidden={!open}
-      inert={!open ? true : undefined}
-      data-open={String(open)}
-      data-entry={entry}
-      className="assistant-overlay"
-      style={{ "--overlay-duration": `${overlayDurationMs(entry, reducedMotion)}ms` } as CSSProperties}
-    >
-      {error ? failure : threadId ? (
-        <Suspense fallback={loading}>
-          <ThreadView threadId={threadId} embed={{ active: open, onClose: close, controlRef: control }} />
-        </Suspense>
-      ) : loading}
-    </div>
-  ) : null;
+  const node =
+    threadId || open || error ? (
+      <div
+        ref={overlay}
+        role="dialog"
+        aria-modal={open ? true : undefined}
+        aria-label="Daniyal's AI assistant"
+        aria-hidden={!open}
+        inert={!open ? true : undefined}
+        data-open={String(open)}
+        data-entry={entry}
+        className="assistant-overlay"
+        style={
+          { "--overlay-duration": `${overlayDurationMs(entry, reducedMotion)}ms` } as CSSProperties
+        }
+      >
+        {error ? (
+          failure
+        ) : threadId ? (
+          <Suspense fallback={loading}>
+            <ThreadView
+              threadId={threadId}
+              embed={{ active: open, onClose: close, controlRef: control }}
+            />
+          </Suspense>
+        ) : (
+          loading
+        )}
+      </div>
+    ) : null;
 
   return { go, node, open };
 }

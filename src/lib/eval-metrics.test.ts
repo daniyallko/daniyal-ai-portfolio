@@ -10,10 +10,15 @@ describe("eval metrics", () => {
     expect(mrr(["x"], ["a"])).toBe(0);
   });
   it("fact coverage is case-insensitive", () => {
-    expect(factCoverage("Built on kubernetes with 99.9% uptime", ["Kubernetes", "99.9", "AWS"])).toBeCloseTo(2 / 3);
+    expect(
+      factCoverage("Built on kubernetes with 99.9% uptime", ["Kubernetes", "99.9", "AWS"]),
+    ).toBeCloseTo(2 / 3);
   });
   it("citation coverage counts cited sentences and flags out-of-range numbers", () => {
-    const s = citationStats("Daniyal built the RAG pipeline at WisdmLabs [1]. He also migrated ten thousand Stripe users [7].  He is a very experienced engineer overall.", 3);
+    const s = citationStats(
+      "Daniyal built the RAG pipeline at WisdmLabs [1]. He also migrated ten thousand Stripe users [7].  He is a very experienced engineer overall.",
+      3,
+    );
     expect(s.coverage).toBeCloseTo(2 / 3);
     expect(s.invalid).toBe(1);
   });

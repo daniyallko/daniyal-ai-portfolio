@@ -21,46 +21,123 @@ vi.mock("@/lib/chat.functions", () => ({
 }));
 vi.mock("@/lib/visitor", () => ({ getVisitorId: () => "visitor-test" }));
 vi.mock("@/components/thread-view", () => ({
-  ThreadView: ({ embed }: { embed: { active: boolean; onClose: () => void; controlRef: { current: unknown } } }) => {
+  ThreadView: ({
+    embed,
+  }: {
+    embed: { active: boolean; onClose: () => void; controlRef: { current: unknown } };
+  }) => {
     const [mount] = useState(() => ++mocks.mounts);
     const [inspection, setInspection] = useState(false);
     embed.controlRef.current = { send: mocks.send, startCall: mocks.startCall, ready: true };
-    return <div data-testid="thread" data-mount={mount}>
-      <button type="button" onClick={embed.onClose}>Inside close</button>
-      <button type="button" onClick={() => setInspection(true)}>Open inspection</button>
-      <button type="button">Inside action</button>
-      <VoiceSwitcher persona={getPersona("lead")} onPersona={() => {}} lock={null} onLock={() => {}} detected={null} previewing={null} previewState="idle" onPreview={() => {}} />
-      <TelemetryPanel
-        telemetry={{ current: { sessionId: "qa", turnId: 0, micRms: 0, zcr: 0, vad: "silence", silenceMs: 0, onsetDetectMs: null, bufferMs: 0, outRms: 0, underruns: 0, playedMs: 0, assistantSpeaking: false, ducked: false, bargeIns: 0, lastBargeCutMs: null, ttfaMs: null, connectedAt: null, lastActivity: 0, maxMs: 300_000, idleMs: 15_000, worklet: false, micAnalyser: null, outAnalyser: null } satisfies VoiceTelemetry }}
-        inCall={false} endpointMs={600} prefetch={[]} dispatches={[]} llmFirstTokenMs={null} ragCache={null} ragMs={null}
-        ttsTtfaMs={null} ttsTtfbMs={null} droppedPackets={0} persona={getPersona("lead")} detected={null} lock={null} bridge={null} delimiter={null} swaps={0}
-      />
-      {inspection && <aside
-        role="dialog"
-        aria-label="Answer inspection"
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopPropagation();
-            setInspection(false);
-          }
-        }}
-      ><button type="button">Close inspection</button></aside>}
-    </div>;
+    return (
+      <div data-testid="thread" data-mount={mount}>
+        <button type="button" onClick={embed.onClose}>
+          Inside close
+        </button>
+        <button type="button" onClick={() => setInspection(true)}>
+          Open inspection
+        </button>
+        <button type="button">Inside action</button>
+        <VoiceSwitcher
+          persona={getPersona("lead")}
+          onPersona={() => {}}
+          lock={null}
+          onLock={() => {}}
+          detected={null}
+          previewing={null}
+          previewState="idle"
+          onPreview={() => {}}
+        />
+        <TelemetryPanel
+          telemetry={{
+            current: {
+              sessionId: "qa",
+              turnId: 0,
+              micRms: 0,
+              zcr: 0,
+              vad: "silence",
+              silenceMs: 0,
+              onsetDetectMs: null,
+              bufferMs: 0,
+              outRms: 0,
+              underruns: 0,
+              playedMs: 0,
+              assistantSpeaking: false,
+              ducked: false,
+              bargeIns: 0,
+              lastBargeCutMs: null,
+              ttfaMs: null,
+              connectedAt: null,
+              lastActivity: 0,
+              maxMs: 300_000,
+              idleMs: 15_000,
+              worklet: false,
+              micAnalyser: null,
+              outAnalyser: null,
+            } satisfies VoiceTelemetry,
+          }}
+          inCall={false}
+          endpointMs={600}
+          prefetch={[]}
+          dispatches={[]}
+          llmFirstTokenMs={null}
+          ragCache={null}
+          ragMs={null}
+          ttsTtfaMs={null}
+          ttsTtfbMs={null}
+          droppedPackets={0}
+          persona={getPersona("lead")}
+          detected={null}
+          lock={null}
+          bridge={null}
+          delimiter={null}
+          swaps={0}
+        />
+        {inspection && (
+          <aside
+            role="dialog"
+            aria-label="Answer inspection"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setInspection(false);
+              }
+            }}
+          >
+            <button type="button">Close inspection</button>
+          </aside>
+        )}
+      </div>
+    );
   },
 }));
 
 function Host({ theme = "dark" }: { theme?: string }) {
   const assistant = useInlineAssistant();
-  return <div data-theme={theme}>
-    <div data-testid="shell" inert={assistant.open ? true : undefined} aria-hidden={assistant.open || undefined}>
-      <button type="button" onClick={() => assistant.go()}>Open empty</button>
-      <button type="button" onClick={() => assistant.go({ q: "Architecture" })}>Open message</button>
-      <button type="button" onClick={() => assistant.go({ q: "Projects" })}>Open projects</button>
-      <button type="button" onClick={() => assistant.go({ call: true })}>Open voice</button>
+  return (
+    <div data-theme={theme}>
+      <div
+        data-testid="shell"
+        inert={assistant.open ? true : undefined}
+        aria-hidden={assistant.open || undefined}
+      >
+        <button type="button" onClick={() => assistant.go()}>
+          Open empty
+        </button>
+        <button type="button" onClick={() => assistant.go({ q: "Architecture" })}>
+          Open message
+        </button>
+        <button type="button" onClick={() => assistant.go({ q: "Projects" })}>
+          Open projects
+        </button>
+        <button type="button" onClick={() => assistant.go({ call: true })}>
+          Open voice
+        </button>
+      </div>
+      {assistant.node}
     </div>
-    {assistant.node}
-  </div>;
+  );
 }
 
 async function openReadyThread() {
@@ -69,7 +146,9 @@ async function openReadyThread() {
   fireEvent.click(screen.getByRole("button", { name: "Open empty" }));
   await screen.findByTestId("thread");
   fireEvent.click(screen.getByRole("button", { name: "Inside close" }));
-  await waitFor(() => expect(screen.getByRole("dialog", { hidden: true })).toHaveAttribute("data-open", "false"));
+  await waitFor(() =>
+    expect(screen.getByRole("dialog", { hidden: true })).toHaveAttribute("data-open", "false"),
+  );
   mocks.send.mockClear();
   mocks.startCall.mockClear();
 }
@@ -86,7 +165,11 @@ beforeEach(() => {
 describe("useInlineAssistant", () => {
   it("adopts an existing thread before considering creation during rapid entry", async () => {
     let resolveList!: (threads: { id: string }[]) => void;
-    mocks.listThreads.mockReturnValue(new Promise<{ id: string }[]>((resolve) => { resolveList = resolve; }));
+    mocks.listThreads.mockReturnValue(
+      new Promise<{ id: string }[]>((resolve) => {
+        resolveList = resolve;
+      }),
+    );
     render(<Host />);
     fireEvent.click(screen.getByRole("button", { name: "Open message" }));
     fireEvent.click(screen.getByText("Open projects"));
@@ -100,7 +183,11 @@ describe("useInlineAssistant", () => {
 
   it("creates only after the shared lookup completes empty", async () => {
     let resolveList!: (threads: { id: string }[]) => void;
-    mocks.listThreads.mockReturnValue(new Promise<{ id: string }[]>((resolve) => { resolveList = resolve; }));
+    mocks.listThreads.mockReturnValue(
+      new Promise<{ id: string }[]>((resolve) => {
+        resolveList = resolve;
+      }),
+    );
     render(<Host />);
     fireEvent.click(screen.getByRole("button", { name: "Open message" }));
     fireEvent.click(screen.getByText("Open projects"));
@@ -128,7 +215,11 @@ describe("useInlineAssistant", () => {
 
   it("shares rapid creation and hands off only the latest request once", async () => {
     let resolve!: (thread: { id: string }) => void;
-    mocks.createThread.mockReturnValue(new Promise<{ id: string }>((r) => { resolve = r; }));
+    mocks.createThread.mockReturnValue(
+      new Promise<{ id: string }>((r) => {
+        resolve = r;
+      }),
+    );
     render(<Host />);
     fireEvent.click(screen.getByRole("button", { name: "Open message" }));
     fireEvent.click(screen.getByText("Open projects"));
@@ -140,7 +231,9 @@ describe("useInlineAssistant", () => {
   });
 
   it("retains a failed request for Retry and supports Close", async () => {
-    mocks.createThread.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ id: "thread-retry" });
+    mocks.createThread
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ id: "thread-retry" });
     render(<Host />);
     const trigger = screen.getByRole("button", { name: "Open message" });
     trigger.focus();
@@ -179,7 +272,10 @@ describe("useInlineAssistant", () => {
     fireEvent.keyDown(trigger, { key: "Escape" });
 
     expect(screen.queryByRole("dialog", { name: "Voice and language" })).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute("data-open", "true");
+    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute(
+      "data-open",
+      "true",
+    );
     expect(trigger).toHaveFocus();
   });
 
@@ -195,7 +291,10 @@ describe("useInlineAssistant", () => {
     fireEvent.keyDown(close, { key: "Escape" });
 
     expect(telemetry).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute("data-open", "true");
+    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute(
+      "data-open",
+      "true",
+    );
   });
 
   it("closes only the nested inspector on Escape", async () => {
@@ -207,7 +306,10 @@ describe("useInlineAssistant", () => {
     fireEvent.keyDown(inspector, { key: "Escape" });
 
     expect(screen.queryByRole("dialog", { name: "Answer inspection" })).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute("data-open", "true");
+    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute(
+      "data-open",
+      "true",
+    );
     expect(document.body.style.overflow).toBe("hidden");
   });
 
@@ -222,7 +324,10 @@ describe("useInlineAssistant", () => {
     Object.defineProperty(event, "target", { value: inspector });
     fireEvent(document, event);
 
-    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute("data-open", "true");
+    expect(screen.getByRole("dialog", { name: "Daniyal's AI assistant" })).toHaveAttribute(
+      "data-open",
+      "true",
+    );
     expect(document.body.style.overflow).toBe("hidden");
   });
 

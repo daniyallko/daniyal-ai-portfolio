@@ -12,17 +12,25 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => ({ options }),
   useNavigate: () => mocks.navigate,
-  Link: ({ children, to, ...props }: { children: ReactNode; to: string }) => <a href={to} {...props}>{children}</a>,
+  Link: ({ children, to, ...props }: { children: ReactNode; to: string }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { signInWithPassword: mocks.signInWithPassword, signUp: mocks.signUp } },
 }));
-vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => <button type="button">Theme</button> }));
+vi.mock("@/components/theme-toggle", () => ({
+  ThemeToggle: () => <button type="button">Theme</button>,
+}));
 
 const AuthPage = Route.options.component!;
 
 function fillForm() {
-  fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "owner@example.com" } });
+  fireEvent.change(screen.getByLabelText("Email address"), {
+    target: { value: "owner@example.com" },
+  });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct-horse" } });
 }
 
@@ -38,7 +46,12 @@ describe("AuthPage", () => {
     fillForm();
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    await waitFor(() => expect(mocks.signInWithPassword).toHaveBeenCalledWith({ email: "owner@example.com", password: "correct-horse" }));
+    await waitFor(() =>
+      expect(mocks.signInWithPassword).toHaveBeenCalledWith({
+        email: "owner@example.com",
+        password: "correct-horse",
+      }),
+    );
     expect(mocks.navigate).toHaveBeenCalledWith({ to: "/admin" });
     expect(screen.getByRole("link", { name: /back to portfolio/i })).toHaveAttribute("href", "/");
   });
@@ -56,7 +69,11 @@ describe("AuthPage", () => {
 
   it("exposes a disabled busy action while sign-in is pending", async () => {
     let resolve!: (value: { error: null }) => void;
-    mocks.signInWithPassword.mockReturnValue(new Promise((r) => { resolve = r; }));
+    mocks.signInWithPassword.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
     render(<AuthPage />);
 
     fillForm();
@@ -77,11 +94,13 @@ describe("AuthPage", () => {
     fillForm();
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-    await waitFor(() => expect(mocks.signUp).toHaveBeenCalledWith({
-      email: "owner@example.com",
-      password: "correct-horse",
-      options: { emailRedirectTo: `${window.location.origin}/admin` },
-    }));
+    await waitFor(() =>
+      expect(mocks.signUp).toHaveBeenCalledWith({
+        email: "owner@example.com",
+        password: "correct-horse",
+        options: { emailRedirectTo: `${window.location.origin}/admin` },
+      }),
+    );
     expect(screen.getByRole("status")).toHaveTextContent(/check your email/i);
   });
 });

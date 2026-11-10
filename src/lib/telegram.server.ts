@@ -8,12 +8,23 @@ function esc(s: string) {
 export async function notifyOwner(lines: (string | null | undefined | false)[]) {
   const lovable = process.env["LOVABLE_API_KEY"];
   const tg = process.env["TELEGRAM_API_KEY"];
-  if (!lovable || !tg) { console.error("Telegram notify skipped: missing keys"); return; }
-  const text = lines.filter(Boolean).map((l) => esc(String(l))).join("\n").slice(0, 4000);
+  if (!lovable || !tg) {
+    console.error("Telegram notify skipped: missing keys");
+    return;
+  }
+  const text = lines
+    .filter(Boolean)
+    .map((l) => esc(String(l)))
+    .join("\n")
+    .slice(0, 4000);
   try {
     const res = await fetch("https://connector-gateway.lovable.dev/telegram/sendMessage", {
       method: "POST",
-      headers: { Authorization: `Bearer ${lovable}`, "X-Connection-Api-Key": tg, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${lovable}`,
+        "X-Connection-Api-Key": tg,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ chat_id: OWNER_CHAT_ID, text, disable_web_page_preview: true }),
     });
     if (!res.ok) console.error(`Telegram notify failed [${res.status}]: ${await res.text()}`);
@@ -22,4 +33,6 @@ export async function notifyOwner(lines: (string | null | undefined | false)[]) 
   }
 }
 
-export function shortId(id: string) { return id.slice(0, 8); }
+export function shortId(id: string) {
+  return id.slice(0, 8);
+}

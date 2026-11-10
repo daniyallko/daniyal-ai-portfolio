@@ -12,13 +12,14 @@ export function HeroBuilding() {
     const syncPausedState = () => {
       root.dataset["paused"] = String(!intersecting || document.visibilityState === "hidden");
     };
-    const observer = typeof IntersectionObserver === "undefined"
-      ? null
-      : new IntersectionObserver(([entry]) => {
-          if (!entry) return;
-          intersecting = entry.isIntersecting;
-          syncPausedState();
-        });
+    const observer =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(([entry]) => {
+            if (!entry) return;
+            intersecting = entry.isIntersecting;
+            syncPausedState();
+          });
 
     observer?.observe(root);
     document.addEventListener("visibilitychange", syncPausedState);
@@ -53,8 +54,18 @@ export function HeroBuilding() {
           />
           <source
             type="image/webp"
+            media="(prefers-reduced-data: reduce)"
+            srcSet="/images/noir-building-900.webp"
+          />
+          <source
+            type="image/webp"
             srcSet="/images/noir-building-900.webp 900w, /images/noir-building-1800.webp 1800w"
             sizes="100vw"
+          />
+          <source
+            type="image/jpeg"
+            media="(prefers-reduced-data: reduce)"
+            srcSet="/images/noir-building-900.jpg"
           />
           <img
             className="hero-building__image"
@@ -77,7 +88,10 @@ export function HeroBuilding() {
           preserveAspectRatio="xMidYMid slice"
         >
           {WINDOW_LIGHT_GROUPS.map((group) => (
-            <g key={group.id} className={`hero-building__window-group hero-building__window-group--${group.id}`}>
+            <g
+              key={group.id}
+              className={`hero-building__window-group hero-building__window-group--${group.id}`}
+            >
               {group.polygons.map((polygon, index) => (
                 <polygon
                   key={index}
@@ -90,7 +104,11 @@ export function HeroBuilding() {
         </svg>
       </div>
 
-      <div className="hero-building__sunlight" data-testid="sunlight" style={{ pointerEvents: "none" }} />
+      <div
+        className="hero-building__sunlight"
+        data-testid="sunlight"
+        style={{ pointerEvents: "none" }}
+      />
       <div className="hero-building__scrim" />
     </div>
   );

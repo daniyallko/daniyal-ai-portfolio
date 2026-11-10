@@ -20,7 +20,9 @@ beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      get matches() { return systemDark; },
+      get matches() {
+        return systemDark;
+      },
       media: query,
       onchange: null,
       addListener: (listener: Listener) => listeners.add(listener),
@@ -38,7 +40,11 @@ afterEach(() => {
 });
 
 function renderToggle() {
-  return render(<ThemeProvider><ThemeToggle /></ThemeProvider>);
+  return render(
+    <ThemeProvider>
+      <ThemeToggle />
+    </ThemeProvider>,
+  );
 }
 
 describe("ThemeProvider and ThemeToggle", () => {
@@ -78,8 +84,12 @@ describe("ThemeProvider and ThemeToggle", () => {
   });
 
   it("does not throw when storage is denied", async () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("Denied"); });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Denied"); });
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("Denied");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("Denied");
+    });
     renderToggle();
     const button = await screen.findByRole("button", { name: "Switch to light theme" });
     expect(() => fireEvent.click(button)).not.toThrow();

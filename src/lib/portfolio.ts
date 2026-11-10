@@ -36,7 +36,8 @@ export const experience: Experience[] = [
     role: "Software Engineer",
     company: "WisdmLabs",
     period: "July 2023 – Present",
-    context: "AI BotKit (multi-tenant AI chatbot platform, team project) and Edwiser.org (production licensing platform)",
+    context:
+      "AI BotKit (multi-tenant AI chatbot platform, team project) and Edwiser.org (production licensing platform)",
     bullets: [
       "AI BotKit: built core components of a multi-tenant RAG chatbot platform, now live on 1,000+ websites and serving 100,000+ users. It scans a customer's website and documents, builds a knowledge base, and embeds a chat widget through a single JavaScript snippet.",
       "Developed the advanced RAG pipeline: Pinecone hybrid search (dense + sparse), cross-encoder reranking, and relevance gating with query reformulation.",
@@ -103,7 +104,8 @@ export const projects: Project[] = [
     name: "Real-time Voice Agent",
     kind: "Personal project",
     blurb: "Streaming voice assistant for live spoken conversations.",
-    details: "Combines speech-to-text, an LLM, and text-to-speech in a streaming pipeline for live spoken conversations.",
+    details:
+      "Combines speech-to-text, an LLM, and text-to-speech in a streaming pipeline for live spoken conversations.",
     tags: ["STT", "LLM", "TTS", "Streaming"],
   },
   {
@@ -111,7 +113,8 @@ export const projects: Project[] = [
     name: "Multi-agent Chatbot",
     kind: "Personal project",
     blurb: "Multiple AI agents coordinating to handle user requests.",
-    details: "A chatbot where several AI agents coordinate via agent orchestration and tool calling to handle user requests.",
+    details:
+      "A chatbot where several AI agents coordinate via agent orchestration and tool calling to handle user requests.",
     tags: ["Orchestration", "Tool calling", "Agents"],
   },
 ];
@@ -119,57 +122,132 @@ export const projects: Project[] = [
 export const skills: { group: string; items: string[] }[] = [
   {
     group: "Agentic AI & LLM",
-    items: ["LangGraph", "LangChain", "Multi-agent orchestration", "Autonomous agents", "Tool calling", "Advanced RAG", "Hybrid search", "Embeddings", "Reranking", "Pinecone", "Prompt engineering", "LangSmith", "OpenAI API", "Gemini API"],
+    items: [
+      "LangGraph",
+      "LangChain",
+      "Multi-agent orchestration",
+      "Autonomous agents",
+      "Tool calling",
+      "Advanced RAG",
+      "Hybrid search",
+      "Embeddings",
+      "Reranking",
+      "Pinecone",
+      "Prompt engineering",
+      "LangSmith",
+      "OpenAI API",
+      "Gemini API",
+    ],
   },
   {
     group: "Voice & Conversational",
-    items: ["Real-time voice agents", "Whisper STT", "Text-to-speech", "AI chatbots", "WhatsApp Cloud API", "Telegram Bot API"],
+    items: [
+      "Real-time voice agents",
+      "Whisper STT",
+      "Text-to-speech",
+      "AI chatbots",
+      "WhatsApp Cloud API",
+      "Telegram Bot API",
+    ],
   },
   {
     group: "Languages & Frameworks",
-    items: ["Python", "FastAPI", "TypeScript", "JavaScript", "Node.js", "React", "Next.js", "PHP", "SQL", "REST APIs", "Webhooks"],
+    items: [
+      "Python",
+      "FastAPI",
+      "TypeScript",
+      "JavaScript",
+      "Node.js",
+      "React",
+      "Next.js",
+      "PHP",
+      "SQL",
+      "REST APIs",
+      "Webhooks",
+    ],
   },
   {
     group: "Data, Cloud & DevOps",
-    items: ["PostgreSQL", "MySQL", "AWS", "Docker", "Kubernetes", "Linux", "CDN", "CI/CD", "Git & GitHub", "Stripe"],
+    items: [
+      "PostgreSQL",
+      "MySQL",
+      "AWS",
+      "Docker",
+      "Kubernetes",
+      "Linux",
+      "CDN",
+      "CI/CD",
+      "Git & GitHub",
+      "Stripe",
+    ],
   },
 ];
 
 export const education = {
   degree: "B.Tech, Computer Science and Engineering",
   period: "2016 – 2020",
-  school: "Babu Banarasi Das Engineering College, Lucknow (Dr. A.P.J. Abdul Kalam Technical University)",
+  school:
+    "Babu Banarasi Das Engineering College, Lucknow (Dr. A.P.J. Abdul Kalam Technical University)",
 };
 
 export type Chunk = { id: string; section: string; title: string; text: string };
 
 // Admin-added documents (loaded server-side from kb_documents) join the corpus here.
 let extraChunks: Chunk[] = [];
-export function setExtraChunks(chunks: Chunk[]) { extraChunks = chunks; }
+export function setExtraChunks(chunks: Chunk[]) {
+  extraChunks = chunks;
+}
 
 /** Split an admin document into ~900-char paragraph-aligned chunks. */
-export function chunkDocument(doc: { id: string; title: string; section: string; content: string }, max = 900): Chunk[] {
-  const paras = doc.content.replace(/\r/g, "").split(/\n\s*\n+/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
+export function chunkDocument(
+  doc: { id: string; title: string; section: string; content: string },
+  max = 900,
+): Chunk[] {
+  const paras = doc.content
+    .replace(/\r/g, "")
+    .split(/\n\s*\n+/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
   const out: string[] = [];
   let cur = "";
-  for (const p of paras.flatMap((p) => p.length > max ? p.match(new RegExp(`.{1,${max}}(\\s|$)`, "g")) ?? [p] : [p])) {
-    if (cur && cur.length + p.length + 1 > max) { out.push(cur); cur = ""; }
+  for (const p of paras.flatMap((p) =>
+    p.length > max ? (p.match(new RegExp(`.{1,${max}}(\\s|$)`, "g")) ?? [p]) : [p],
+  )) {
+    if (cur && cur.length + p.length + 1 > max) {
+      out.push(cur);
+      cur = "";
+    }
     cur = cur ? `${cur} ${p.trim()}` : p.trim();
   }
   if (cur) out.push(cur);
-  return out.map((text, i) => ({ id: `doc-${doc.id.slice(0, 8)}-${i}`, section: doc.section, title: out.length > 1 ? `${doc.title} (${i + 1}/${out.length})` : doc.title, text }));
+  return out.map((text, i) => ({
+    id: `doc-${doc.id.slice(0, 8)}-${i}`,
+    section: doc.section,
+    title: out.length > 1 ? `${doc.title} (${i + 1}/${out.length})` : doc.title,
+    text,
+  }));
 }
 
 export function buildChunks(): Chunk[] {
   const chunks: Chunk[] = [
-    { id: "profile", section: "Profile", title: `${profile.name} — ${profile.title}`, text: `${profile.summary} Specializes in ${profile.tagline}.` },
+    {
+      id: "profile",
+      section: "Profile",
+      title: `${profile.name} — ${profile.title}`,
+      text: `${profile.summary} Specializes in ${profile.tagline}.`,
+    },
     {
       id: "contact",
       section: "Contact",
       title: "Contact & availability",
       text: `Location: ${profile.location}. Availability: ${profile.availability}. Email: ${profile.email}. Phone: ${profile.phone}. Website: ${profile.website}.`,
     },
-    { id: "education", section: "Education", title: education.degree, text: `${education.degree}, ${education.period}, ${education.school}.` },
+    {
+      id: "education",
+      section: "Education",
+      title: education.degree,
+      text: `${education.degree}, ${education.period}, ${education.school}.`,
+    },
   ];
   for (const e of experience) {
     e.bullets.forEach((b, i) =>
@@ -182,10 +260,20 @@ export function buildChunks(): Chunk[] {
     );
   }
   for (const p of projects) {
-    chunks.push({ id: `proj-${p.id}`, section: "Projects", title: p.name, text: `${p.name} (${p.kind}): ${p.blurb} ${p.details} Tech: ${p.tags.join(", ")}.` });
+    chunks.push({
+      id: `proj-${p.id}`,
+      section: "Projects",
+      title: p.name,
+      text: `${p.name} (${p.kind}): ${p.blurb} ${p.details} Tech: ${p.tags.join(", ")}.`,
+    });
   }
   for (const s of skills) {
-    chunks.push({ id: `skill-${s.group.toLowerCase().replace(/[^a-z]+/g, "-")}`, section: "Skills", title: s.group, text: `${s.group} skills: ${s.items.join(", ")}.` });
+    chunks.push({
+      id: `skill-${s.group.toLowerCase().replace(/[^a-z]+/g, "-")}`,
+      section: "Skills",
+      title: s.group,
+      text: `${s.group} skills: ${s.items.join(", ")}.`,
+    });
   }
   return [...chunks, ...extraChunks];
 }

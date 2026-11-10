@@ -25,17 +25,30 @@ export const Route = createFileRoute("/api/speak")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const body = (await request.json().catch(() => null)) as { text?: unknown; voice?: unknown; lang?: unknown } | null;
+        const body = (await request.json().catch(() => null)) as {
+          text?: unknown;
+          voice?: unknown;
+          lang?: unknown;
+        } | null;
         const text = prepareForSpeech(typeof body?.text === "string" ? body.text : "");
         if (!text) return Response.json({ error: "Nothing to read aloud" }, { status: 400 });
 
         // Bind the persona's voice and the language so the synthesizer uses native pronunciation.
-        const voiceName = VOICE_PERSONAS.some((p) => p.ttsVoice === body?.voice) ? (body!.voice as string) : getPersona(null).ttsVoice;
+        const voiceName = VOICE_PERSONAS.some((p) => p.ttsVoice === body?.voice)
+          ? (body!.voice as string)
+          : getPersona(null).ttsVoice;
         const lang = isLangCode(body?.lang) ? body.lang : detectLanguage(text).code;
         const key = `${voiceName}|${lang}|${text}`;
         const hit = cache.get(key);
         if (hit && Date.now() - hit.at < TTL_MS) {
-          return new Response(hit.audio, { headers: { "content-type": "audio/wav", "cache-control": "no-store", "x-voice": voiceName, "x-lang": lang } });
+          return new Response(hit.audio, {
+            headers: {
+              "content-type": "audio/wav",
+              "cache-control": "no-store",
+              "x-voice": voiceName,
+              "x-lang": lang,
+            },
+          });
         }
 
         try {
@@ -45,7 +58,10 @@ export const Route = createFileRoute("/api/speak")({
               contents: [{ role: "user", parts: [{ text }] }],
               generationConfig: {
                 responseModalities: ["AUDIO"],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } }, languageCode: LANGUAGES[lang].bcp47 },
+                speechConfig: {
+                  voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+                  languageCode: LANGUAGES[lang].bcp47,
+                },
               },
             },
             { signal: request.signal },
@@ -53,10 +69,16 @@ export const Route = createFileRoute("/api/speak")({
           const audio = await res.blob().then((b) => b.arrayBuffer());
           remember(key, audio);
           return new Response(audio, {
-            headers: { "content-type": res.contentType || "audio/wav", "cache-control": "no-store", "x-voice": voiceName, "x-lang": lang },
+            headers: {
+              "content-type": res.contentType || "audio/wav",
+              "cache-control": "no-store",
+              "x-voice": voiceName,
+              "x-lang": lang,
+            },
           });
         } catch (e) {
-          if (request.signal.aborted || (e as Error)?.name === "AbortError") return new Response(null, { status: 499 });
+          if (request.signal.aborted || (e as Error)?.name === "AbortError")
+            return new Response(null, { status: 499 });
           console.error(e);
           return Response.json(
             { error: e instanceof GatewayError ? e.message : "Could not generate audio" },

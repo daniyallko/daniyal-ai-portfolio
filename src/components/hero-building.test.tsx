@@ -66,9 +66,23 @@ describe("HeroBuilding", () => {
     expect(frame).toContainElement(svg);
     expect(svg).toHaveAttribute("viewBox", BUILDING_VIEW_BOX);
     expect(svg).toHaveAttribute("preserveAspectRatio", "xMidYMid slice");
-    expect(container.querySelector('source[type="image/avif"]')).toHaveAttribute("srcset", expect.stringContaining("noir-building-900.avif"));
-    expect(container.querySelector('source[type="image/webp"]')).toHaveAttribute("srcset", expect.stringContaining("noir-building-1800.webp"));
-    expect(container.querySelector('source[media*="prefers-reduced-data"]')).toHaveAttribute("srcset", "/images/noir-building-900.avif");
+    expect(container.querySelector('source[type="image/avif"]:not([media])')).toHaveAttribute(
+      "srcset",
+      expect.stringContaining("noir-building-900.avif"),
+    );
+    expect(container.querySelector('source[type="image/webp"]:not([media])')).toHaveAttribute(
+      "srcset",
+      expect.stringContaining("noir-building-1800.webp"),
+    );
+    expect(
+      container.querySelector('source[type="image/avif"][media*="prefers-reduced-data"]'),
+    ).toHaveAttribute("srcset", "/images/noir-building-900.avif");
+    expect(
+      container.querySelector('source[type="image/webp"][media*="prefers-reduced-data"]'),
+    ).toHaveAttribute("srcset", "/images/noir-building-900.webp");
+    expect(
+      container.querySelector('source[type="image/jpeg"][media*="prefers-reduced-data"]'),
+    ).toHaveAttribute("srcset", "/images/noir-building-900.jpg");
     expect(container.innerHTML).not.toContain("unsplash.com");
   });
 
@@ -79,7 +93,10 @@ describe("HeroBuilding", () => {
 
     expect(polygons).toHaveLength(expected.length);
     polygons.forEach((polygon, index) => {
-      expect(polygon).toHaveAttribute("points", expected[index]!.map((point) => point.join(",")).join(" "));
+      expect(polygon).toHaveAttribute(
+        "points",
+        expected[index]!.map((point) => point.join(",")).join(" "),
+      );
     });
     expect(screen.getByTestId("sunlight")).toHaveStyle({ pointerEvents: "none" });
   });
@@ -90,9 +107,19 @@ describe("HeroBuilding", () => {
     expect(observe).toHaveBeenCalledWith(root);
     expect(root).toHaveAttribute("data-paused", "false");
 
-    act(() => observerCallback([{ isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver));
+    act(() =>
+      observerCallback(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    );
     expect(root).toHaveAttribute("data-paused", "true");
-    act(() => observerCallback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+    act(() =>
+      observerCallback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    );
     expect(root).toHaveAttribute("data-paused", "false");
 
     visibility = "hidden";

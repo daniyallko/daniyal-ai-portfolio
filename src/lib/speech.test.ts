@@ -3,7 +3,8 @@ import { prepareForSpeech, speakableText, trimForSpeech } from "./speech";
 
 describe("read-aloud text", () => {
   it("keeps the answer and drops citation chips, markdown and links", () => {
-    const md = "## Headline\nHe migrated **40,000** Stripe customers [1] with `zero` downtime.\nSee [the write-up](https://example.com/post).";
+    const md =
+      "## Headline\nHe migrated **40,000** Stripe customers [1] with `zero` downtime.\nSee [the write-up](https://example.com/post).";
     const out = speakableText(md);
     expect(out).toContain("He migrated 40,000 Stripe customers with zero downtime.");
     expect(out).not.toContain("[1]");

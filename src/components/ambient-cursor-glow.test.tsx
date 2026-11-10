@@ -8,12 +8,22 @@ afterEach(() => {
 });
 
 describe("AmbientCursorGlow", () => {
-  it.each(["(pointer: coarse)", "(prefers-reduced-motion: reduce)"])("does not subscribe to pointer movement when %s matches", (query) => {
-    vi.stubGlobal("matchMedia", vi.fn((candidate: string) => ({ matches: candidate.includes(query) })));
-    const addEventListener = vi.spyOn(window, "addEventListener");
+  it.each(["(pointer: coarse)", "(prefers-reduced-motion: reduce)"])(
+    "does not subscribe to pointer movement when %s matches",
+    (query) => {
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn((candidate: string) => ({ matches: candidate.includes(query) })),
+      );
+      const addEventListener = vi.spyOn(window, "addEventListener");
 
-    render(<AmbientCursorGlow />);
+      render(<AmbientCursorGlow />);
 
-    expect(addEventListener).not.toHaveBeenCalledWith("pointermove", expect.any(Function), expect.anything());
-  });
+      expect(addEventListener).not.toHaveBeenCalledWith(
+        "pointermove",
+        expect.any(Function),
+        expect.anything(),
+      );
+    },
+  );
 });

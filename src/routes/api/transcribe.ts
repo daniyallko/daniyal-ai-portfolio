@@ -9,8 +9,10 @@ export const Route = createFileRoute("/api/transcribe")({
       POST: async ({ request }) => {
         const form = await request.formData().catch(() => null);
         const file = form?.get("file");
-        if (!(file instanceof Blob) || file.size === 0) return Response.json({ error: "No audio received" }, { status: 400 });
-        if (file.size > MAX_BYTES) return Response.json({ error: "Recording is too long" }, { status: 413 });
+        if (!(file instanceof Blob) || file.size === 0)
+          return Response.json({ error: "No audio received" }, { status: 400 });
+        if (file.size > MAX_BYTES)
+          return Response.json({ error: "Recording is too long" }, { status: 413 });
         try {
           const named = file;
           const res = await transcribeAudio({ model: "openai/gpt-transcribe", file: named });
@@ -18,7 +20,10 @@ export const Route = createFileRoute("/api/transcribe")({
           return Response.json({ text: out.text?.trim() ?? "", language: out.language ?? null });
         } catch (e) {
           console.error(e);
-          return Response.json({ error: e instanceof GatewayError ? e.message : "Transcription failed" }, { status: 502 });
+          return Response.json(
+            { error: e instanceof GatewayError ? e.message : "Transcription failed" },
+            { status: 502 },
+          );
         }
       },
     },

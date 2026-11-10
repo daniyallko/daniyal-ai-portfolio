@@ -15,37 +15,75 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }));
-vi.mock("@/lib/chat.functions", () => ({ getThread: mocks.getThread, appendVoiceTurns: mocks.appendVoiceTurns }));
+vi.mock("@/lib/chat.functions", () => ({
+  getThread: mocks.getThread,
+  appendVoiceTurns: mocks.appendVoiceTurns,
+}));
 vi.mock("@/lib/visitor", () => ({ getVisitorId: () => "visitor-test" }));
 vi.mock("@/components/voice-switcher", () => ({
   VoiceSwitcher: () => <div>Voice settings</div>,
   useVoicePrefs: () => ({
     persona: { id: "lead", ttsVoice: "voice", gender: "male" },
-    setPersonaId: vi.fn(), lock: null, setLock: vi.fn(),
+    setPersonaId: vi.fn(),
+    lock: null,
+    setLock: vi.fn(),
   }),
 }));
 vi.mock("@/hooks/use-speech", () => ({
   useSpeech: () => ({
-    id: null, state: "idle", error: null, speak: mocks.speak, stop: vi.fn(), hotSwap: vi.fn(),
-    ttfaMs: null, ttfbMs: null, delimiter: null, swaps: 0,
+    id: null,
+    state: "idle",
+    error: null,
+    speak: mocks.speak,
+    stop: vi.fn(),
+    hotSwap: vi.fn(),
+    ttfaMs: null,
+    ttfbMs: null,
+    delimiter: null,
+    swaps: 0,
   }),
 }));
 vi.mock("@/hooks/use-live-voice", () => ({
   useLiveVoice: () => ({
-    status: "idle", error: null, endReason: null, muted: false, outputMuted: false, playbackBlocked: false,
-    telemetry: { current: {} }, audioRef: { current: null }, start: mocks.start, stop: mocks.stop,
-    setMuted: vi.fn(), setOutputMuted: vi.fn(), resumePlayback: vi.fn(),
+    status: "idle",
+    error: null,
+    endReason: null,
+    muted: false,
+    outputMuted: false,
+    playbackBlocked: false,
+    telemetry: { current: {} },
+    audioRef: { current: null },
+    start: mocks.start,
+    stop: mocks.stop,
+    setMuted: vi.fn(),
+    setOutputMuted: vi.fn(),
+    resumePlayback: vi.fn(),
   }),
 }));
-vi.mock("@/components/voice-diagnostics", () => ({ TelemetryPanel: () => null, VoiceOrb: () => null }));
-vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => <button type="button" aria-label="Theme options">Theme</button> }));
+vi.mock("@/components/voice-diagnostics", () => ({
+  TelemetryPanel: () => null,
+  VoiceOrb: () => null,
+}));
+vi.mock("@/components/theme-toggle", () => ({
+  ThemeToggle: () => (
+    <button type="button" aria-label="Theme options">
+      Theme
+    </button>
+  ),
+}));
 
 function renderThread(threadId = "thread-1") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><ThreadView threadId={threadId} /></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <ThreadView threadId={threadId} />
+    </QueryClientProvider>,
+  );
 }
 
-function thread(messages: { id: string; role: string; content: string; sources?: string; debug?: string }[] = []) {
+function thread(
+  messages: { id: string; role: string; content: string; sources?: string; debug?: string }[] = [],
+) {
   return { id: "thread-1", title: "Chat", messages };
 }
 
@@ -55,7 +93,9 @@ class MockMediaRecorder {
   state = "inactive";
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
-  start = vi.fn(() => { this.state = "recording"; });
+  start = vi.fn(() => {
+    this.state = "recording";
+  });
   stop = vi.fn();
 
   constructor(readonly stream: MediaStream) {}
@@ -81,10 +121,16 @@ describe("ThreadView", () => {
     renderThread("thread-retry");
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't load this chat/i);
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("heading", { name: "Ask me about Daniyal." })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Ask me about Daniyal." }),
+    ).toBeInTheDocument();
     expect(mocks.getThread).toHaveBeenCalledTimes(2);
-    expect(mocks.getThread).toHaveBeenNthCalledWith(1, { data: { visitorId: "visitor-test", threadId: "thread-retry" } });
-    expect(mocks.getThread).toHaveBeenNthCalledWith(2, { data: { visitorId: "visitor-test", threadId: "thread-retry" } });
+    expect(mocks.getThread).toHaveBeenNthCalledWith(1, {
+      data: { visitorId: "visitor-test", threadId: "thread-retry" },
+    });
+    expect(mocks.getThread).toHaveBeenNthCalledWith(2, {
+      data: { visitorId: "visitor-test", threadId: "thread-retry" },
+    });
   });
 
   it("places theme controls in the shared chat header", async () => {
@@ -96,7 +142,19 @@ describe("ThreadView", () => {
   it("preserves sources → delta → done streaming and answer-only listen controls", async () => {
     mocks.getThread.mockResolvedValue(thread());
     const events = [
-      { type: "sources", sources: [{ n: 1, id: "project-atlas", section: "Projects", title: "Project Atlas", text: "Atlas details" }], debug: { model: "test-model" } },
+      {
+        type: "sources",
+        sources: [
+          {
+            n: 1,
+            id: "project-atlas",
+            section: "Projects",
+            title: "Project Atlas",
+            text: "Atlas details",
+          },
+        ],
+        debug: { model: "test-model" },
+      },
       { type: "delta", text: "Grounded " },
       { type: "delta", text: "answer [1]." },
       { type: "done", debug: { model: "test-model", timingsMs: { firstToken: 20 } } },
@@ -126,7 +184,9 @@ describe("ThreadView", () => {
   });
 
   it("disables answer read-aloud while recording a question", async () => {
-    mocks.getThread.mockResolvedValue(thread([{ id: "answer-1", role: "assistant", content: "A grounded answer." }]));
+    mocks.getThread.mockResolvedValue(
+      thread([{ id: "answer-1", role: "assistant", content: "A grounded answer." }]),
+    );
     vi.stubGlobal("MediaRecorder", MockMediaRecorder);
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,

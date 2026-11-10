@@ -30,3 +30,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local QA and execution scratch
+.playwright-mcp/
+.superpowers/

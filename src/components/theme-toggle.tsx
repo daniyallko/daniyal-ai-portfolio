@@ -7,7 +7,8 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  if (!mounted) return <span aria-hidden="true" className={`inline-block h-11 w-11 shrink-0 ${className}`} />;
+  if (!mounted)
+    return <span aria-hidden="true" className={`inline-block h-11 w-11 shrink-0 ${className}`} />;
   const next = theme === "dark" ? "light" : "dark";
   const Icon = theme === "dark" ? Sun : Moon;
   return (

@@ -53,7 +53,9 @@ function upgradeRequest(request: IncomingMessage): Request {
 
 function rejectUpgrade(socket: Duplex, status: number) {
   if (!socket.destroyed) {
-    socket.end(`HTTP/1.1 ${status} Voice connection rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    socket.end(
+      `HTTP/1.1 ${status} Voice connection rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`,
+    );
   }
 }
 
@@ -71,16 +73,21 @@ export function liveVoiceDev(): Plugin {
       let relayPromise: Promise<typeof import("./src/lib/live-relay.server")> | undefined;
       const loadRelay = async (): Promise<typeof import("./src/lib/live-relay.server")> => {
         try {
-          return (await server.ssrLoadModule("/src/lib/live-relay.server.ts")) as typeof import("./src/lib/live-relay.server");
+          return (await server.ssrLoadModule(
+            "/src/lib/live-relay.server.ts",
+          )) as typeof import("./src/lib/live-relay.server");
         } catch {
           // Vite's runnerImport resolves the "@/" alias without a running SSR environment.
           relayPromise ??= import("vite").then(async ({ runnerImport }) => {
             const root = process.cwd();
-            const r = await runnerImport<typeof import("./src/lib/live-relay.server")>(`${root}/src/lib/live-relay.server.ts`, {
-              configFile: false,
-              root,
-              resolve: { alias: { "@": `${root}/src` } },
-            });
+            const r = await runnerImport<typeof import("./src/lib/live-relay.server")>(
+              `${root}/src/lib/live-relay.server.ts`,
+              {
+                configFile: false,
+                root,
+                resolve: { alias: { "@": `${root}/src` } },
+              },
+            );
             return r.module;
           });
           return await relayPromise;
@@ -95,7 +102,9 @@ export function liveVoiceDev(): Plugin {
           try {
             const relay = await loadRelay();
             const config = relay.getLiveConfig(request.url);
-            const rejection = relay.validateLiveUpgrade(upgradeRequest(request), { allowMissingOrigin: true });
+            const rejection = relay.validateLiveUpgrade(upgradeRequest(request), {
+              allowMissingOrigin: true,
+            });
             if (rejection) return rejectUpgrade(socket, rejection.status);
             if (socket.destroyed) return;
             sockets.handleUpgrade(request, socket, head, (connection) => {

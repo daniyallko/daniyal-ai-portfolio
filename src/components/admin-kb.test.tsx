@@ -18,20 +18,40 @@ vi.mock("@/lib/admin.functions", () => ({
   adminReindexKb: mocks.adminReindexKb,
   adminSaveKbDoc: mocks.adminSaveKbDoc,
 }));
-vi.mock("unpdf", () => ({ getDocumentProxy: mocks.getDocumentProxy, extractText: mocks.extractText }));
+vi.mock("unpdf", () => ({
+  getDocumentProxy: mocks.getDocumentProxy,
+  extractText: mocks.extractText,
+}));
 
-const doc = { id: "doc-1", title: "Owner handbook", section: "Documents", content: "A sufficiently long source document for the recruiter knowledge base.", source_type: "text", chunks: 2 };
-const base = [{ id: "base-1", section: "Projects", title: "AI BotKit", text: "Built-in project evidence." }];
+const doc = {
+  id: "doc-1",
+  title: "Owner handbook",
+  section: "Documents",
+  content: "A sufficiently long source document for the recruiter knowledge base.",
+  source_type: "text",
+  chunks: 2,
+};
+const base = [
+  { id: "base-1", section: "Projects", title: "AI BotKit", text: "Built-in project evidence." },
+];
 
 function renderKb() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><AdminKb /></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <AdminKb />
+    </QueryClientProvider>,
+  );
 }
 
 function fillValidDraft() {
-  fireEvent.change(screen.getByLabelText("Source title"), { target: { value: "New certification" } });
+  fireEvent.change(screen.getByLabelText("Source title"), {
+    target: { value: "New certification" },
+  });
   fireEvent.change(screen.getByLabelText("Section"), { target: { value: "Certifications" } });
-  fireEvent.change(screen.getByLabelText("Source content"), { target: { value: "Detailed certification evidence with enough characters to save." } });
+  fireEvent.change(screen.getByLabelText("Source content"), {
+    target: { value: "Detailed certification evidence with enough characters to save." },
+  });
 }
 
 beforeEach(() => {
@@ -58,30 +78,58 @@ describe("AdminKb", () => {
     expect(save).toBeEnabled();
     fireEvent.click(save);
 
-    await waitFor(() => expect(mocks.adminSaveKbDoc).toHaveBeenCalledWith({ data: { title: "New certification", section: "Certifications", content: "Detailed certification evidence with enough characters to save.", source_type: "text" } }));
-    expect(await screen.findByRole("status")).toHaveTextContent(/Add ok — corpus 42 chunks, embedded \+ cache warmed in 120ms/);
+    await waitFor(() =>
+      expect(mocks.adminSaveKbDoc).toHaveBeenCalledWith({
+        data: {
+          title: "New certification",
+          section: "Certifications",
+          content: "Detailed certification evidence with enough characters to save.",
+          source_type: "text",
+        },
+      }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /Add ok — corpus 42 chunks, embedded \+ cache warmed in 120ms/,
+    );
   });
 
   it("extracts PDF text for review and preserves PDF draft type", async () => {
-    mocks.extractText.mockResolvedValue({ text: ["First extracted page with useful evidence.", "Second extracted page with more detail."] });
+    mocks.extractText.mockResolvedValue({
+      text: [
+        "First extracted page with useful evidence.",
+        "Second extracted page with more detail.",
+      ],
+    });
     renderKb();
     const file = new File(["pdf"], "research-notes.pdf", { type: "application/pdf" });
-    Object.defineProperty(file, "arrayBuffer", { value: vi.fn().mockResolvedValue(new Uint8Array([1, 2]).buffer) });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: vi.fn().mockResolvedValue(new Uint8Array([1, 2]).buffer),
+    });
 
     fireEvent.change(screen.getByLabelText("Upload PDF"), { target: { files: [file] } });
-    expect(await screen.findByRole("status")).toHaveTextContent(/Extracted .* characters — review, then save/);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /Extracted .* characters — review, then save/,
+    );
     expect(screen.getByLabelText("Source title")).toHaveValue("research-notes");
-    expect(screen.getByLabelText("Source content")).toHaveValue("First extracted page with useful evidence.\n\nSecond extracted page with more detail.");
+    expect(screen.getByLabelText("Source content")).toHaveValue(
+      "First extracted page with useful evidence.\n\nSecond extracted page with more detail.",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Add + reindex" }));
-    await waitFor(() => expect(mocks.adminSaveKbDoc).toHaveBeenCalledWith({ data: expect.objectContaining({ source_type: "pdf", title: "research-notes" }) }));
+    await waitFor(() =>
+      expect(mocks.adminSaveKbDoc).toHaveBeenCalledWith({
+        data: expect.objectContaining({ source_type: "pdf", title: "research-notes" }),
+      }),
+    );
   });
 
   it("announces PDF extraction failures", async () => {
     mocks.extractText.mockRejectedValue(new Error("Malformed PDF"));
     renderKb();
     const file = new File(["pdf"], "broken.pdf", { type: "application/pdf" });
-    Object.defineProperty(file, "arrayBuffer", { value: vi.fn().mockResolvedValue(new Uint8Array([1]).buffer) });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: vi.fn().mockResolvedValue(new Uint8Array([1]).buffer),
+    });
 
     fireEvent.change(screen.getByLabelText("Upload PDF"), { target: { files: [file] } });
     expect(await screen.findByRole("alert")).toHaveTextContent("PDF failed: Malformed PDF");
@@ -92,7 +140,9 @@ describe("AdminKb", () => {
     renderKb();
     fireEvent.click(await screen.findByRole("button", { name: 'Delete "Owner handbook"' }));
     expect(window.confirm).toHaveBeenCalledWith('Delete "Owner handbook"?');
-    await waitFor(() => expect(mocks.adminDeleteKbDoc).toHaveBeenCalledWith({ data: { id: "doc-1" } }));
+    await waitFor(() =>
+      expect(mocks.adminDeleteKbDoc).toHaveBeenCalledWith({ data: { id: "doc-1" } }),
+    );
     expect(await screen.findByRole("status")).toHaveTextContent(/Delete ok — corpus 40 chunks/);
 
     fireEvent.click(screen.getByRole("button", { name: "Reindex + warm cache" }));

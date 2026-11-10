@@ -14,7 +14,13 @@ function renderSwitcher() {
       onPersona={onPersona}
       lock={null}
       onLock={onLock}
-      detected={{ code: "fr", name: LANGUAGES.fr.name, script: "Latin", isCodeSwitched: false, confidence: 0.9 }}
+      detected={{
+        code: "fr",
+        name: LANGUAGES.fr.name,
+        script: "Latin",
+        isCodeSwitched: false,
+        confidence: 0.9,
+      }}
       previewing={null}
       previewState="idle"
       onPreview={onPreview}
@@ -32,16 +38,26 @@ afterEach(() => vi.restoreAllMocks());
 
 function VoicePrefsHarness() {
   const prefs = useVoicePrefs();
-  return <button type="button" onClick={() => prefs.setPersonaId("architect")}>Current: {prefs.persona.name}</button>;
+  return (
+    <button type="button" onClick={() => prefs.setPersonaId("architect")}>
+      Current: {prefs.persona.name}
+    </button>
+  );
 }
 
 describe("VoiceSwitcher", () => {
   it("retains in-memory preferences when storage reads and writes are denied", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new DOMException("Denied", "SecurityError"); });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Denied", "SecurityError"); });
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("Denied", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Denied", "SecurityError");
+    });
     render(<VoicePrefsHarness />);
     fireEvent.click(screen.getByRole("button", { name: "Current: Engineering Lead" }));
-    expect(screen.getByRole("button", { name: "Current: Technical Architect" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Current: Technical Architect" }),
+    ).toBeInTheDocument();
   });
 
   it("selects and previews real personas and locks a language", () => {
@@ -56,7 +72,9 @@ describe("VoiceSwitcher", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview Technical Architect" }));
     expect(spies.onPreview).toHaveBeenCalledWith(getPersona("architect"));
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "fr" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), {
+      target: { value: "fr" },
+    });
     expect(spies.onLock).toHaveBeenCalledWith("fr");
   });
 
@@ -82,7 +100,9 @@ describe("VoiceSwitcher", () => {
     const dialog = screen.getByRole("dialog", { name: "Voice and language" });
     expect(dialog.className).toContain("w-[min(360px,calc(100vw-2rem))]");
     expect(screen.getByText("Conversational Peer").className).not.toContain("truncate");
-    expect(screen.getByRole("button", { name: "Preview Technical Architect" }).className).toContain("min-w-11");
+    expect(screen.getByRole("button", { name: "Preview Technical Architect" }).className).toContain(
+      "min-w-11",
+    );
     expect(screen.getByRole("option", { name: "Lock: Portuguese" })).toBeInTheDocument();
   });
 });

@@ -12,9 +12,14 @@ const thread = read("src/components/thread-view.tsx");
 const home = read("src/routes/index.tsx");
 const ambient = read("src/components/ambient-cursor-glow.tsx");
 
-const reducedMotionBlock = css.match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
-const reducedBuildingBlock = css.match(/@media \(prefers-reduced-motion: reduce\), \(prefers-reduced-data: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
-const reducedDataBlock = css.match(/@media \(prefers-reduced-data: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+const reducedMotionBlock =
+  css.match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+const reducedBuildingBlock =
+  css.match(
+    /@media \(prefers-reduced-motion: reduce\), \(prefers-reduced-data: reduce\) \{([\s\S]*?)\n\}/,
+  )?.[1] ?? "";
+const reducedDataBlock =
+  css.match(/@media \(prefers-reduced-data: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
 
 function keyframesBody(name: string) {
   const start = css.indexOf(`@keyframes ${name} {`);
@@ -31,22 +36,39 @@ function keyframesBody(name: string) {
 
 describe("Noir motion and reduced-data safeguards", () => {
   it("disables building, window, sunlight, reveal, caret, and cinematic motion", () => {
-    for (const name of ["hero-building__frame", "hero-building__window", "hero-building__sunlight"]) {
+    for (const name of [
+      "hero-building__frame",
+      "hero-building__window",
+      "hero-building__sunlight",
+    ]) {
       expect(reducedBuildingBlock).toContain(`.${name}`);
     }
     expect(reducedBuildingBlock).toContain("animation: none");
-    for (const name of ["reveal", "hero-exit", "assistant-overlay", "chat-message-in", "voice-console"]) {
+    for (const name of [
+      "reveal",
+      "hero-exit",
+      "assistant-overlay",
+      "chat-message-in",
+      "voice-console",
+    ]) {
       expect(reducedMotionBlock).toContain(`.${name}`);
     }
     expect(reducedMotionBlock).toContain(".caret");
     expect(reducedMotionBlock).toContain(".ambient-glow");
     expect(hero).toContain("useTypewriter(PROMPTS, !reducedMotion");
-    expect(overlay).toContain("if (reducedMotion || entry === \"voice\") return 0");
+    expect(overlay).toContain('if (reducedMotion || entry === "voice") return 0');
   });
 
   it("places the complete reduced-motion override after every motion declaration", () => {
     const override = css.lastIndexOf("@media (prefers-reduced-motion: reduce) {");
-    for (const declaration of [".hero-enter {", ".assistant-overlay {", ".chat-message-in {", ".voice-popover, .telemetry-popover {", ".home-hero {", ".hero-building__image {"]) {
+    for (const declaration of [
+      ".hero-enter {",
+      ".assistant-overlay {",
+      ".chat-message-in {",
+      ".voice-popover, .telemetry-popover {",
+      ".home-hero {",
+      ".hero-building__image {",
+    ]) {
       expect(css.indexOf(declaration), declaration).toBeLessThan(override);
     }
     const finalBlock = css.slice(override);
@@ -64,22 +86,37 @@ describe("Noir motion and reduced-data safeguards", () => {
 
   it("honors reduced motion for every programmatic smooth scroll", () => {
     for (const source of [thread, home]) {
-      expect(source).toContain('window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"');
+      expect(source).toContain(
+        'window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"',
+      );
       expect(source).not.toContain('scrollIntoView({ behavior: "smooth"');
     }
   });
 
   it("removes decorative overlays and selects the smaller image for reduced data", () => {
-    expect(reducedDataBlock).toMatch(/\.ambient-glow,\s*\.hero-building__windows,\s*\.hero-building__sunlight\s*\{\s*display:\s*none;/);
+    expect(reducedDataBlock).toMatch(
+      /\.ambient-glow,\s*\.hero-building__windows,\s*\.hero-building__sunlight\s*\{\s*display:\s*none;/,
+    );
     expect(building).toContain('media="(prefers-reduced-data: reduce)"');
     expect(building).toContain('srcSet="/images/noir-building-900.avif"');
+    expect(building).toContain('srcSet="/images/noir-building-900.webp"');
+    expect(building).toContain('srcSet="/images/noir-building-900.jpg"');
   });
 
   it("keeps continuous keyframes on compositor-friendly transform and opacity", () => {
-    for (const name of ["breathe", "caret", "signal-pulse", "hero-building-drift", "hero-window-glow", "hero-sunlight"]) {
+    for (const name of [
+      "breathe",
+      "caret",
+      "signal-pulse",
+      "hero-building-drift",
+      "hero-window-glow",
+      "hero-sunlight",
+    ]) {
       const body = keyframesBody(name);
       expect(body, name).not.toBe("");
-      expect(body, name).not.toMatch(/(?:^|[;{])\s*(?:box-shadow|background(?:-color)?|filter|clip-path|width|height|top|left)\s*:/);
+      expect(body, name).not.toMatch(
+        /(?:^|[;{])\s*(?:box-shadow|background(?:-color)?|filter|clip-path|width|height|top|left)\s*:/,
+      );
       expect(body, name).toMatch(/(?:transform|opacity)\s*:/);
     }
   });
@@ -94,7 +131,10 @@ describe("Noir motion and reduced-data safeguards", () => {
   });
 
   it("adds no animation runtime dependency", () => {
-    const pkg = JSON.parse(read("package.json")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const pkg = JSON.parse(read("package.json")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
     const dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
     for (const name of ["gsap", "framer-motion", "motion", "@react-spring/web"]) {
       expect(dependencies[name]).toBeUndefined();

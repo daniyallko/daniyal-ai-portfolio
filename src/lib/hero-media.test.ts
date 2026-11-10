@@ -8,7 +8,9 @@ describe("building window geometry", () => {
 
   it("traces at least twelve real windows in three staggered groups", () => {
     expect(WINDOW_LIGHT_GROUPS).toHaveLength(3);
-    expect(WINDOW_LIGHT_GROUPS.flatMap((group) => group.polygons).length).toBeGreaterThanOrEqual(12);
+    expect(WINDOW_LIGHT_GROUPS.flatMap((group) => group.polygons).length).toBeGreaterThanOrEqual(
+      12,
+    );
   });
 
   it("uses bounded numeric source coordinates, never percentages", () => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PolyglotAdaptiveChunker, detectLanguageAndRegister, getMultilingualEndpointTimeoutMs, normalizeCrossLingualRagQuery } from "./multilingualVoiceEngine";
+import {
+  PolyglotAdaptiveChunker,
+  detectLanguageAndRegister,
+  getMultilingualEndpointTimeoutMs,
+  normalizeCrossLingualRagQuery,
+} from "./multilingualVoiceEngine";
 
 describe("multilingualVoiceEngine", () => {
   it("detects Devanagari Hinglish with tech terms", () => {
@@ -8,10 +13,14 @@ describe("multilingualVoiceEngine", () => {
     expect(d.isCodeSwitched).toBe(true);
   });
   it("detects romanized Hinglish", () => {
-    expect(detectLanguageAndRegister("mujhe aapke projects ke baare mein batao").langName).toBe("Hinglish (Conversational)");
+    expect(detectLanguageAndRegister("mujhe aapke projects ke baare mein batao").langName).toBe(
+      "Hinglish (Conversational)",
+    );
   });
   it("normalizes Hindi query to English keywords", () => {
-    const n = normalizeCrossLingualRagQuery("मुझे आपके Kubernetes और Terraform प्रोजेक्ट्स के बारे में बताइए");
+    const n = normalizeCrossLingualRagQuery(
+      "मुझे आपके Kubernetes और Terraform प्रोजेक्ट्स के बारे में बताइए",
+    );
     expect(n.extractedTechEntities).toEqual(expect.arrayContaining(["kubernetes", "terraform"]));
     expect(n.englishSearchQuery).toContain("projects");
   });

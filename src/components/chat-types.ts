@@ -7,7 +7,16 @@ export type Debug = {
   usage?: unknown;
   cache?: string;
   bridge?: { raw: string; tokens: string[]; normalized: string; ms: number };
-  candidates?: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
+  candidates?: {
+    id: string;
+    title: string;
+    bm25: number;
+    dense: number;
+    bm25Rank: number | null;
+    denseRank: number | null;
+    rrf: number;
+    kept: boolean;
+  }[];
 };
 
 export type Msg = {

@@ -32,7 +32,9 @@ describe("homepage preservation contracts", () => {
     expect(hero.match(/<HeroBuilding\s*\/>/g)).toHaveLength(1);
     expect(source).not.toContain("function Hero()");
     expect(source).toMatch(/<main id="top"[^>]*>\s*<HomeHero onOpen=\{assistant\.go\} \/>/);
-    expect(source).toMatch(/<HomeHero onOpen=\{assistant\.go\} \/>\s*<div className="[^"]*mx-auto[^"]*max-w-6xl/);
+    expect(source).toMatch(
+      /<HomeHero onOpen=\{assistant\.go\} \/>\s*<div className="[^"]*mx-auto[^"]*max-w-6xl/,
+    );
   });
 
   it("keeps reveal content visible until JS opts into motion", () => {

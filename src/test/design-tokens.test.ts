@@ -16,7 +16,15 @@ describe("Noir Signal semantic tokens", () => {
   );
 
   it("uses the approved canvas, text, and accent colors", () => {
-    for (const color of ["#0b0c0c", "#f2f2eb", "#cfff62", "#f2f0e9", "#141510", "#c6ec5b", "#506c00"]) {
+    for (const color of [
+      "#0b0c0c",
+      "#f2f2eb",
+      "#cfff62",
+      "#f2f0e9",
+      "#141510",
+      "#c6ec5b",
+      "#506c00",
+    ]) {
       expect(css.toLowerCase()).toContain(color);
     }
   });
@@ -26,7 +34,12 @@ describe("Noir Signal semantic tokens", () => {
   });
 
   it("keeps muted and placeholder text at the AA-compliant semantic token", () => {
-    for (const path of ["src/components/thread-view.tsx", "src/components/chat-inspector.tsx", "src/components/admin-kb.tsx", "src/routes/auth.tsx"]) {
+    for (const path of [
+      "src/components/thread-view.tsx",
+      "src/components/chat-inspector.tsx",
+      "src/components/admin-kb.tsx",
+      "src/routes/auth.tsx",
+    ]) {
       const source = readFileSync(resolve(process.cwd(), path), "utf8");
       expect(source, path).not.toMatch(/text-muted-foreground\/\d+/);
     }

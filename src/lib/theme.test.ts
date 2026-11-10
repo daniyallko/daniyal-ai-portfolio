@@ -18,7 +18,9 @@ function runInit(stored: string | null, systemDark: boolean, denyStorage = false
       return { matches: systemDark };
     },
   };
-  expect(() => new Function("window", "document", themeInitScript())(windowMock, document)).not.toThrow();
+  expect(() =>
+    new Function("window", "document", themeInitScript())(windowMock, document),
+  ).not.toThrow();
   return document.documentElement;
 }
 

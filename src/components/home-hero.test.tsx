@@ -31,7 +31,9 @@ class MockMediaRecorder {
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
   start = vi.fn();
-  stop = vi.fn(() => { void this.onstop?.(); });
+  stop = vi.fn(() => {
+    void this.onstop?.();
+  });
 
   constructor(readonly stream: MediaStream) {
     MockMediaRecorder.instance = this;
@@ -59,7 +61,9 @@ describe("HomeHero", () => {
     fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
 
     expect(onOpen).toHaveBeenCalledWith({ q: "Tell me about RAG" });
-    expect(mocks.stop.mock.invocationCallOrder[0]).toBeLessThan(onOpen.mock.invocationCallOrder[0]!);
+    expect(mocks.stop.mock.invocationCallOrder[0]).toBeLessThan(
+      onOpen.mock.invocationCallOrder[0]!,
+    );
     expect(input).toHaveValue("");
     expect(screen.getByTestId("hero-building")).toHaveAttribute("aria-hidden", "true");
   });
@@ -68,7 +72,10 @@ describe("HomeHero", () => {
     const onOpen = vi.fn();
     render(<HomeHero onOpen={onOpen} />);
     const suggestions = [
-      ["System architecture", { q: "Walk me through the architecture of AI BotKit's RAG pipeline." }],
+      [
+        "System architecture",
+        { q: "Walk me through the architecture of AI BotKit's RAG pipeline." },
+      ],
       ["Featured projects", { q: "What are Daniyal's most impressive projects?" }],
       ["Start voice intro", { call: true }],
       ["Résumé & availability", { q: "Summarize his experience and availability for new roles." }],
@@ -79,18 +86,28 @@ describe("HomeHero", () => {
       expect(onOpen).toHaveBeenLastCalledWith(request);
     }
     fireEvent.click(screen.getByRole("button", { name: "Advanced RAG" }));
-    expect(onOpen).toHaveBeenLastCalledWith({ q: "Tell me about Daniyal's experience with Advanced RAG." });
+    expect(onOpen).toHaveBeenLastCalledWith({
+      q: "Tell me about Daniyal's experience with Advanced RAG.",
+    });
     fireEvent.click(screen.getByRole("button", { name: "Talk live with Daniyal's AI" }));
     expect(onOpen).toHaveBeenLastCalledWith({ call: true });
     expect(onOpen).toHaveBeenCalledTimes(6);
   });
 
   it("uses a static prompt without a caret under reduced motion", () => {
-    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({ matches: query.includes("prefers-reduced-motion"), media: query })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+      })),
+    );
     const { container } = render(<HomeHero onOpen={vi.fn()} />);
 
     expect(mocks.typewriter).toHaveBeenCalledWith(expect.any(Array), false);
-    expect(screen.getByText("Ask anything about Daniyal's AI and engineering experience…")).toBeInTheDocument();
+    expect(
+      screen.getByText("Ask anything about Daniyal's AI and engineering experience…"),
+    ).toBeInTheDocument();
     expect(container.querySelector(".caret")).toBeNull();
   });
 
@@ -104,7 +121,9 @@ describe("HomeHero", () => {
     });
     const view = render(<HomeHero onOpen={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Dictate a question" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Stop dictation" })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Stop dictation" })).toBeInTheDocument(),
+    );
     const recorder = MockMediaRecorder.instance;
 
     view.unmount();
@@ -123,28 +142,38 @@ describe("HomeHero", () => {
       configurable: true,
       value: { getUserMedia: vi.fn().mockResolvedValue(stream) },
     });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ text: "transcribed question" }),
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ text: "transcribed question" }),
+      }),
+    );
     const onOpen = vi.fn();
     render(<HomeHero onOpen={onOpen} />);
     const input = screen.getByRole("textbox", { name: "Ask about Daniyal" });
     fireEvent.change(input, { target: { value: "Existing" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Dictate a question" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Stop dictation" })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Stop dictation" })).toBeInTheDocument(),
+    );
     const recorder = MockMediaRecorder.instance;
     expect(recorder.start).toHaveBeenCalledOnce();
 
     act(() => {
-      recorder.ondataavailable?.({ data: new Blob([new Uint8Array(1200)], { type: "audio/webm" }) });
+      recorder.ondataavailable?.({
+        data: new Blob([new Uint8Array(1200)], { type: "audio/webm" }),
+      });
       fireEvent.click(screen.getByRole("button", { name: "Stop dictation" }));
     });
 
     await waitFor(() => expect(input).toHaveValue("Existing transcribed question"));
     expect(stopTrack).toHaveBeenCalledOnce();
-    expect(fetch).toHaveBeenCalledWith("/api/transcribe", expect.objectContaining({ method: "POST", body: expect.any(FormData) }));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/transcribe",
+      expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
+    );
     expect(input).toHaveFocus();
     expect(onOpen).not.toHaveBeenCalled();
   });
