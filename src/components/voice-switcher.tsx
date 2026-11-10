@@ -135,7 +135,7 @@ export function VoiceSwitcher(props: {
           id="voice-language-popover"
           role="dialog"
           aria-label="Voice and language"
-          className="voice-popover fixed z-[100] w-[min(360px,calc(100vw-1rem))] overflow-y-auto overscroll-contain border border-hairline bg-card shadow-2xl"
+          className="voice-popover fixed z-[100] w-[min(360px,calc(100vw-2rem))] overflow-y-auto overscroll-contain border border-hairline bg-card shadow-2xl"
         >
           <div className="border-b border-hairline px-4 py-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal">
