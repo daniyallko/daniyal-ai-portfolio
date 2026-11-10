@@ -20,7 +20,7 @@ export function AssistantMessage({
   speakState: "idle" | "loading" | "playing";
   speakDisabled: boolean;
 }) {
-  const md = m.content.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)");
+  const md = linkifyContacts(m.content.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)"));
   const canSpeak = m.content.trim().length > 0;
   const latest = useRef({ m, onCite });
   latest.current = { m, onCite };
@@ -39,6 +39,22 @@ export function AssistantMessage({
       ),
       a: ({ href, children }) => {
         const n = href?.startsWith("#cite-") ? Number(href.slice(6)) : null;
+        if (n == null && href === "/api/public/resume")
+          return (
+            <a
+              href={href}
+              download
+              className="not-prose my-1 inline-flex min-h-10 items-center gap-2 rounded-sm border border-primary px-3 font-mono text-xs text-signal no-underline transition-colors hover:bg-primary hover:text-primary-foreground"
+            >
+              ↓ {children}
+            </a>
+          );
+        if (n == null && (href?.startsWith("mailto:") || href?.startsWith("tel:")))
+          return (
+            <a href={href} className="text-signal underline decoration-hairline underline-offset-4 hover:decoration-signal">
+              {children}
+            </a>
+          );
         if (n == null)
           return (
             <a
@@ -141,4 +157,11 @@ export function AssistantMessage({
       )}
     </article>
   );
+}
+
+/** Turn plain owner email/phone mentions into clickable links (skips ones already inside markdown links). */
+export function linkifyContacts(text: string): string {
+  return text
+    .replace(/(?<![[(:])daniyallko@gmail\.com(?![\]])/g, "[daniyallko@gmail.com](mailto:daniyallko@gmail.com)")
+    .replace(/(?<![[(:\d])\+?91[\s-]?7007[\s-]?644[\s-]?677(?![\]\d])/g, "[+91 7007644677](tel:+917007644677)");
 }
