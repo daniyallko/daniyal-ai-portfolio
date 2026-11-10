@@ -9,30 +9,48 @@ import {
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { ArrowLeft, ArrowUpRight, RotateCcw } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AmbientCursorGlow } from "@/components/ambient-cursor-glow";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { themeInitScript } from "@/lib/theme";
+
+function RecoveryShell({ code, eyebrow, title, copy, children }: { code: string; eyebrow: string; title: string; copy: string; children: ReactNode }) {
+  return (
+    <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-background bg-grid px-4 py-28 sm:px-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,var(--glow-a),transparent_46%)]" aria-hidden="true" />
+      <header className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-4 sm:px-6 lg:px-10">
+        <Link to="/" className="inline-flex min-h-11 items-center gap-3" aria-label="Daniyal portfolio home">
+          <span className="grid h-9 w-9 place-items-center border border-signal/50 bg-primary font-serif text-2xl italic text-primary-foreground">d</span>
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:inline">Mohd Daniyal / AI engineer</span>
+        </Link>
+        <ThemeToggle />
+      </header>
+      <section className="relative w-full max-w-2xl text-center" aria-labelledby="recovery-title">
+        <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-signal">{eyebrow}</p>
+        <p className="pointer-events-none select-none font-serif text-[clamp(7rem,24vw,13rem)] leading-[0.8] tracking-[-0.06em] text-foreground/[0.07]" aria-hidden="true">{code}</p>
+        <h1 id="recovery-title" className="-mt-5 font-serif text-4xl leading-tight tracking-[-0.025em] sm:-mt-8 sm:text-5xl">{title}</h1>
+        <p className="mx-auto mt-5 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">{copy}</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">{children}</div>
+      </section>
+      <p className="absolute bottom-6 left-1/2 w-full -translate-x-1/2 px-4 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Signal interrupted · route recovery available</p>
+    </main>
+  );
+}
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
-      </div>
-    </div>
+    <RecoveryShell code="404" eyebrow="Error / route not found" title="Page not found. Signal lost." copy="The page you’re looking for doesn’t exist or has moved. Return to the portfolio, or pick up the conversation with Daniyal’s AI.">
+      <Link to="/" className="inline-flex min-h-12 items-center justify-center gap-2 bg-primary px-5 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:transform-none">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />Go home
+      </Link>
+      <Link to="/chat" className="inline-flex min-h-12 items-center justify-center gap-2 border border-hairline bg-card px-5 text-sm font-medium text-foreground transition-colors hover:border-signal hover:text-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        Ask Daniyal’s AI<ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+      </Link>
+    </RecoveryShell>
   );
 }
 
@@ -44,33 +62,21 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   }, [error]);
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
-        </div>
-      </div>
-    </div>
+    <RecoveryShell code="500" eyebrow="Error / render interrupted" title="This page didn’t load." copy="Something interrupted this view. Retry the route without losing your place, or return to the public portfolio.">
+      <button
+        type="button"
+        onClick={() => {
+          router.invalidate();
+          reset();
+        }}
+        className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 bg-primary px-5 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:transform-none"
+      >
+        <RotateCcw className="h-4 w-4" aria-hidden="true" />Try again
+      </button>
+      <a href="/" className="inline-flex min-h-12 items-center justify-center gap-2 border border-hairline bg-card px-5 text-sm font-medium text-foreground transition-colors hover:border-signal hover:text-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />Go home
+      </a>
+    </RecoveryShell>
   );
 }
 
@@ -105,8 +111,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
         <HeadContent />
       </head>
       <body>
@@ -148,9 +155,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <AmbientCursorGlow />
-      <Outlet />
+      <ThemeProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <AmbientCursorGlow />
+        <Outlet />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

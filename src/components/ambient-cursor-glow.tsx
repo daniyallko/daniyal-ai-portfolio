@@ -12,7 +12,7 @@ export function AmbientCursorGlow() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (window.matchMedia("(pointer: coarse)").matches) return;
+    if (window.matchMedia("(pointer: coarse), (prefers-reduced-motion: reduce)").matches) return;
     let raf = 0;
     let x = window.innerWidth / 2;
     let y = window.innerHeight * 0.3;

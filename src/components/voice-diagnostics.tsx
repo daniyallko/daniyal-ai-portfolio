@@ -26,6 +26,7 @@ export function VoiceOrb({ telemetry, active, retrievingRef }: { telemetry: Muta
     if (!c) return;
     const g = c.getContext("2d");
     if (!g) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const dpr = window.devicePixelRatio || 1;
     const W = 96, H = 96;
     c.width = W * dpr; c.height = H * dpr;
@@ -70,14 +71,14 @@ export function VoiceOrb({ telemetry, active, retrievingRef }: { telemetry: Muta
           g.beginPath(); g.arc(cx, cy, r + 8, a0 + (k * Math.PI * 2) / 3, a0 + (k * Math.PI * 2) / 3 + 0.6); g.stroke();
         }
       }
-      raf = requestAnimationFrame(draw);
+      if (!reducedMotion) raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
   }, [telemetry, active, retrievingRef]);
   return (
     <div className="flex flex-col items-center">
-      <canvas ref={ref} style={{ width: 96, height: 96 }} aria-hidden />
+      <canvas ref={ref} className="voice-orb__canvas" style={{ width: 96, height: 96 }} aria-hidden />
       <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground" aria-live="polite">{label}</span>
     </div>
   );
@@ -88,9 +89,9 @@ export type PrefetchLog = { query: string; cache: string; ms: number };
 
 function Row({ k, v, warn }: { k: string; v: string; warn?: boolean }) {
   return (
-    <div className="flex justify-between gap-3 border-b border-border py-1 last:border-0">
-      <dt className="text-muted-foreground">{k}</dt>
-      <dd className={`tabular-nums ${warn ? "text-destructive" : "text-foreground"}`}>{v}</dd>
+    <div className="flex min-w-0 justify-between gap-3 border-b border-hairline py-1.5 last:border-0">
+      <dt className="shrink-0 text-muted-foreground">{k}</dt>
+      <dd className={`min-w-0 text-right tabular-nums ${warn ? "text-destructive" : "text-foreground"}`} style={{ overflowWrap: "anywhere" }}>{v}</dd>
     </div>
   );
 }
@@ -327,7 +328,7 @@ function Checklist({ checks }: { checks: Check[] }) {
   return (
     <ul className="space-y-1">
       {checks.map((c) => (
-        <li key={c.name} className="grid grid-cols-[48px_1fr] gap-2">
+        <li key={c.name} className="grid grid-cols-[48px_minmax(0,1fr)] gap-2">
           <span className={`border px-1 text-center ${c.status === "pass" ? "border-primary bg-primary text-primary-foreground" : c.status === "fail" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border text-muted-foreground"}`}>{c.status === "pass" ? "PASS" : c.status === "fail" ? "FAIL" : c.status === "running" ? "…" : "—"}</span>
           <span><span className="text-foreground">{c.name}</span>{c.detail && <span className="block break-words text-muted-foreground">{c.detail}</span>}</span>
         </li>
@@ -371,7 +372,9 @@ export function TelemetryPanel(props: {
   const [open, setOpen] = useState(false);
   const [, tick] = useState(0);
   const [checks, setChecks] = useState<Check[]>(CHECKS.map((name) => ({ name, status: "idle", detail: "" })));
+  const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") { e.preventDefault(); setOpen((o) => !o); }
     };
@@ -380,9 +383,21 @@ export function TelemetryPanel(props: {
   }, []);
   useEffect(() => {
     if (!open) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("keydown", onEscape, true);
     const id = setInterval(() => tick((n) => n + 1), 100);
-    return () => clearInterval(id);
+    return () => {
+      document.removeEventListener("keydown", onEscape, true);
+      clearInterval(id);
+    };
   }, [open]);
+  if (!import.meta.env.DEV) return null;
   const running = checks.some((c) => c.status === "running") || mlChecks.some((c) => c.status === "running");
   const runAll = () => runSuite(RUNNERS, setChecks);
   const runMl = () => runSuite(ML_RUNNERS, setMlChecks);
@@ -400,16 +415,16 @@ export function TelemetryPanel(props: {
   const { at: _at, ...toolPayload } = lastTool ?? { at: 0 };
   return (
     <>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="telemetry-hud" title="Telemetry (Ctrl+Shift+D)" className="fixed bottom-24 right-4 z-30 flex items-center gap-1.5 border border-primary bg-background px-2.5 py-1 font-mono text-[11px] text-primary hover:bg-primary hover:text-primary-foreground">
-        ⚡ Telemetry {remaining !== null && <span className="tabular-nums">· {mmss(remaining)}</span>}
+      <button ref={triggerRef} type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="telemetry-hud" title="Telemetry (Ctrl+Shift+D)" className="telemetry-trigger fixed bottom-40 right-3 z-30 flex min-h-11 items-center gap-2 rounded-full border border-signal/60 bg-background/95 px-3 font-mono text-[10px] uppercase tracking-[0.12em] text-signal shadow-lg backdrop-blur-xl transition-colors hover:bg-primary hover:text-primary-foreground sm:right-4">
+        <Activity className="h-3.5 w-3.5" aria-hidden="true" /> Telemetry {remaining !== null && <span className="tabular-nums">· {mmss(remaining)}</span>}
       </button>
       {open && (
-        <section id="telemetry-hud" role="dialog" aria-label="Voice and RAG telemetry" className="fixed bottom-32 right-4 z-30 max-h-[70vh] w-[min(560px,calc(100vw-2rem))] overflow-y-auto border border-border bg-card font-mono text-[11px] shadow-2xl">
-          <header className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <section id="telemetry-hud" role="dialog" aria-label="Voice and RAG telemetry" className="telemetry-popover fixed bottom-52 left-3 right-3 top-3 z-30 overflow-y-auto border border-hairline bg-card font-mono text-[11px] shadow-2xl sm:bottom-52 sm:left-auto sm:right-4 sm:top-auto sm:max-h-[70dvh] sm:w-[min(560px,calc(100vw-2rem))]">
+          <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-hairline bg-card px-3 py-2">
             <Activity className="h-3.5 w-3.5 text-primary" />
             <span className="text-foreground">voice & rag telemetry</span>
             <span className="ml-auto text-muted-foreground">ctrl+shift+d</span>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close telemetry" className="text-muted-foreground hover:text-foreground"><ChevronDown className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => setOpen(false)} aria-label="Close telemetry" className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><ChevronDown className="h-4 w-4" aria-hidden="true" /></button>
           </header>
           <div className="grid gap-px bg-border sm:grid-cols-2">
             <dl className="bg-card p-3">
@@ -491,14 +506,14 @@ export function TelemetryPanel(props: {
           <div className="border-t border-border p-3">
             <div className="mb-2 flex items-center">
               <p className="text-primary">system check</p>
-              <button type="button" onClick={runAll} disabled={running} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run System Check"}</button>
+              <button type="button" onClick={runAll} disabled={running} className="ml-auto min-h-11 rounded-full border border-signal px-3 text-signal transition-colors hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run System Check"}</button>
             </div>
             <Checklist checks={checks} />
           </div>
           <div className="border-t border-border p-3">
             <div className="mb-2 flex items-center">
               <p className="text-primary">multilingual & voice check</p>
-              <button type="button" onClick={runMl} disabled={running} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run Multilingual & Voice Check"}</button>
+              <button type="button" onClick={runMl} disabled={running} className="ml-auto min-h-11 rounded-full border border-signal px-3 text-signal transition-colors hover:bg-primary hover:text-primary-foreground disabled:opacity-50">{running ? "running…" : "Run Multilingual & Voice Check"}</button>
             </div>
             <Checklist checks={mlChecks} />
           </div>

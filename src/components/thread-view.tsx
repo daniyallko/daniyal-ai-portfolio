@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { ArrowUp, Bug, FileText, Square, Terminal, X, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2, Volume2, Pause, VolumeX } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Square, ArrowLeft, Mic, AudioLines, PhoneOff, MicOff, Loader2, Volume2, VolumeX } from "lucide-react";
+import { AssistantMessage } from "@/components/chat-message";
+import { InspectPanel } from "@/components/chat-inspector";
+import type { Debug, Msg, Source } from "@/components/chat-types";
 import { useSpeech } from "@/hooks/use-speech";
 import { useLiveVoice, type LiveEvent } from "@/hooks/use-live-voice";
 import { appendVoiceTurns, getThread } from "@/lib/chat.functions";
@@ -10,22 +12,11 @@ import { actionHref, actionLabel, detectActions, endpointSilenceMs, normalizeQue
 import { TelemetryPanel, VoiceOrb, type Dispatch, type PrefetchLog } from "@/components/voice-diagnostics";
 import { getVisitorId } from "@/lib/visitor";
 import { VoiceSwitcher, useVoicePrefs } from "@/components/voice-switcher";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { detectLanguage, previewLine, type DetectedLanguage } from "@/lib/language";
 import { browserCache, rememberBrowser } from "@/lib/rag-browser";
 import { answerKey, fingerprint, retrievalKey, type CacheEntry } from "@/lib/rag-cache";
 import { CHAT_MODEL, CHAT_SYSTEM } from "@/lib/prompt";
-
-type Source = { n: number; id: string; section: string; title: string; text: string };
-type Debug = {
-  query?: string;
-  model?: string;
-  timingsMs?: Record<string, number | null>;
-  usage?: unknown;
-  cache?: string;
-  bridge?: { raw: string; tokens: string[]; normalized: string; ms: number };
-  candidates?: { id: string; title: string; bm25: number; dense: number; bm25Rank: number | null; denseRank: number | null; rrf: number; kept: boolean }[];
-};
-type Msg = { id: string; role: "user" | "assistant"; content: string; sources?: Source[] | undefined; debug?: Debug | undefined; error?: string | undefined };
 
 const SUGGESTIONS = [
   "What RAG systems has Daniyal built in production?",
@@ -41,7 +32,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
   const visitorId = getVisitorId();
   const qc = useQueryClient();
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [loaded, setLoaded] = useState<"loading" | "ok" | "missing">("loading");
+  const [loaded, setLoaded] = useState<"loading" | "ok" | "missing" | "error">("loading");
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<"idle" | "submitted" | "streaming">("idle");
   const [panel, setPanel] = useState<{ msgId: string; tab: "sources" | "dev"; focus?: number } | null>(null);
@@ -187,13 +178,16 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
   const lastDebug = [...messages].reverse().find((m) => m.role === "assistant" && m.debug?.timingsMs)?.debug;
   const startCall = () => { speech.stop(); turnsRef.current = []; setCaptions([]); turnRef.current = 0; dropAssistantRef.current = false; pendingBargeRef.current = null; voice.start(); };
 
-  useEffect(() => {
+  const loadThread = useCallback(() => {
+    setLoaded("loading");
     getThread({ data: { visitorId, threadId } }).then((t) => {
       if (!t) return setLoaded("missing");
       setMessages(t.messages.map((m) => ({ id: m.id, role: m.role as Msg["role"], content: m.content, sources: m.sources ? (JSON.parse(m.sources) as Source[]) : undefined, debug: m.debug ? (JSON.parse(m.debug) as Debug) : undefined })));
       setLoaded("ok");
-    });
+    }).catch(() => setLoaded("error"));
   }, [threadId, visitorId]);
+
+  useEffect(() => { loadThread(); }, [loadThread]);
 
   // Hand-off from the homepage command dock: send its question or start a live call once.
   const pendingDone = useRef(false);
@@ -210,7 +204,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
     } catch { /* ignore */ }
   }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, status]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }, [messages, status]);
   useEffect(() => { if (status === "idle" && (!embed || embed.active)) taRef.current?.focus(); }, [status, loaded, embed?.active]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (text: string) => {
@@ -306,270 +300,182 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
 
   useEffect(() => () => { const mr = recorderRef.current; if (mr && mr.state !== "inactive") { mr.onstop = null; mr.stop(); mr.stream.getTracks().forEach((t) => t.stop()); } }, []);
 
+  if (loaded === "error")
+    return (
+      <div className="assistant-boot" role="alert">
+        <span className="assistant-boot__mark" aria-hidden>d</span>
+        <h1 className="text-xl font-semibold">Chat unavailable</h1>
+        <p>Couldn't load this chat. Check your connection and try again.</p>
+        <div className="flex gap-2">
+          <button type="button" className="assistant-boot__primary" onClick={loadThread}>Retry</button>
+          {embed && <button type="button" onClick={embed.onClose}>Close</button>}
+        </div>
+      </div>
+    );
+
   if (loaded === "missing")
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-        <p>This chat doesn't exist.</p>
-        <Link to="/chat" className="text-primary">Start a new one</Link>
+      <div className="assistant-boot">
+        <span className="assistant-boot__mark" aria-hidden="true">d</span>
+        <h1 className="text-xl font-semibold text-foreground">Conversation not found</h1>
+        <p>This chat doesn't exist in this browser.</p>
+        <Link to="/chat" className="assistant-boot__primary inline-flex min-h-11 items-center rounded-full px-5">Start a new one</Link>
       </div>
     );
 
   const active = panel ? messages.find((m) => m.id === panel.msgId) : undefined;
 
   return (
-    <div className="flex h-full">
+    <div className="chat-surface flex h-full min-h-0 bg-background">
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-border px-6 py-3">
-          {embed ? <button type="button" onClick={embed.onClose} aria-label="Back to portfolio" className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /></button> : <Link to="/" className="md:hidden text-muted-foreground"><ArrowLeft className="h-4 w-4" /></Link>}
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent"><Terminal className="h-4 w-4 text-primary" /></div>
-          <div>
-            <p className="text-sm font-semibold">daniyal.ai</p>
-            <p className="font-mono text-xs text-muted-foreground">hybrid RAG · answers cite sources</p>
+        <header className="safe-top relative z-10 flex min-h-[72px] shrink-0 items-center gap-2 border-b border-hairline bg-background/90 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-6">
+          {embed ? <button type="button" onClick={embed.onClose} aria-label="Back to portfolio" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hairline text-muted-foreground transition-colors hover:border-signal hover:text-signal"><ArrowLeft className="h-4 w-4" aria-hidden="true" /></button> : <Link to="/" aria-label="Back to portfolio" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hairline text-muted-foreground transition-colors hover:border-signal hover:text-signal md:hidden"><ArrowLeft className="h-4 w-4" aria-hidden="true" /></Link>}
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-signal/40 bg-accent font-serif text-xl italic text-signal" aria-hidden="true">d</div>
+          <div className={`min-w-0 ${embed ? "hidden min-[420px]:block" : "hidden xl:block"}`}>
+            <p className="truncate text-sm font-semibold tracking-[-0.01em]">daniyal.ai <span className="ml-1 font-mono text-[9px] font-normal uppercase tracking-[0.16em] text-signal">live index</span></p>
+            <p className="hidden font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground sm:block">Hybrid RAG · every claim has a source</p>
           </div>
-          <VoiceSwitcher
-            persona={prefs.persona}
-            onPersona={choosePersona}
-            lock={prefs.lock}
-            onLock={prefs.setLock}
-            detected={detected}
-            previewing={speech.id}
-            previewState={speech.state}
-            onPreview={(p) => { if (!inCall) void speech.speak(`preview:${p.id}`, previewLine(activeLang ?? "en", p.gender === "female"), { voice: p.ttsVoice, lang: activeLang ?? "en" }); }}
-          />
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+            <ThemeToggle />
+            <VoiceSwitcher
+              persona={prefs.persona}
+              onPersona={choosePersona}
+              lock={prefs.lock}
+              onLock={prefs.setLock}
+              detected={detected}
+              previewing={speech.id}
+              previewState={speech.state}
+              onPreview={(p) => { if (!inCall) void speech.speak(`preview:${p.id}`, previewLine(activeLang ?? "en", p.gender === "female"), { voice: p.ttsVoice, lang: activeLang ?? "en" }); }}
+            />
+          </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+        <div className="chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-7 sm:px-6 sm:py-10">
             {loaded === "ok" && messages.length === 0 && (
-              <div className="pt-10">
-                <h1 className="text-3xl font-semibold">Ask me about Daniyal.</h1>
-                <p className="mt-2 text-muted-foreground">I answer from his portfolio only, and every claim links to its source.</p>
-                <div className="mt-6 grid gap-2 sm:grid-cols-2">
-                  {SUGGESTIONS.map((s) => (
-                    <button key={s} onClick={() => send(s)} className="rounded-lg border border-border bg-card p-3 text-left text-sm hover:border-primary/50">{s}</button>
+              <section className="chat-empty pt-6 sm:pt-12" aria-labelledby="empty-chat-title">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-signal">Portfolio intelligence / 001</p>
+                <h1 id="empty-chat-title" className="mt-4 max-w-xl font-serif text-5xl leading-[0.98] tracking-[-0.04em] sm:text-6xl">Ask me about <em className="text-signal">Daniyal.</em></h1>
+                <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground">Answers come from his portfolio only. Follow the evidence, inspect the retrieval, or start a voice conversation.</p>
+                <div className="mt-8 grid gap-px overflow-hidden border border-hairline bg-hairline sm:grid-cols-2">
+                  {SUGGESTIONS.map((s, i) => (
+                    <button type="button" key={s} onClick={() => send(s)} className="group min-h-24 bg-card p-4 text-left transition-colors hover:bg-accent sm:p-5">
+                      <span className="mb-3 block font-mono text-[10px] text-signal">0{i + 1}</span>
+                      <span className="block text-sm leading-relaxed text-foreground/85 transition-colors group-hover:text-foreground">{s}</span>
+                    </button>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
             {messages.map((m) =>
               m.role === "user" ? (
-                <div key={m.id} className="flex justify-end">
-                  <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-primary-foreground">{m.content}</div>
+                <div key={m.id} className="chat-message-in flex justify-end pl-10 sm:pl-20">
+                  <div className="max-w-[42rem] border-r-2 border-signal bg-secondary px-4 py-3 text-[15px] leading-relaxed text-secondary-foreground sm:px-5" style={{ overflowWrap: "anywhere" }}>
+                    <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">You</span>
+                    {m.content}
+                  </div>
                 </div>
               ) : (
+                <div key={m.id} className="chat-message-in border-l border-hairline pl-4 sm:pl-6">
                 <AssistantMessage
-                  key={m.id}
                   m={m}
                   onCite={(n) => setPanel({ msgId: m.id, tab: "sources", focus: n })}
                   onDev={() => setPanel({ msgId: m.id, tab: "dev" })}
                   onSpeak={() => speech.speak(m.id, m.content)}
                   speakState={speech.id === m.id ? speech.state : "idle"}
-                  speakDisabled={inCall || (status !== "idle" && m.id === messages[messages.length - 1]?.id)}
+                  speakDisabled={inCall || rec !== "idle" || (status !== "idle" && m.id === messages[messages.length - 1]?.id)}
                 />
+                </div>
               ),
             )}
             {status === "submitted" && (
-              <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
-                <span className="inline-block h-3 w-1.5 animate-pulse bg-primary" /> retrieving sources…
+              <div role="status" className="flex items-center gap-3 border-l border-signal/50 pl-4 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground sm:pl-6">
+                <span className="signal-pulse inline-block h-4 w-1 bg-signal" /> retrieving sources<span className="signal-ellipsis" aria-hidden="true">…</span>
               </div>
             )}
             <div ref={endRef} />
           </div>
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mx-auto w-full max-w-3xl px-6 pb-6">
+        <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="composer-dock safe-bottom relative mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 sm:px-6 sm:pb-6">
           <audio ref={voice.audioRef} className="hidden" />
           <TelemetryPanel telemetry={voice.telemetry} inCall={inCall} endpointMs={endpointMs} prefetch={prefetchLog} dispatches={dispatches} llmFirstTokenMs={(lastDebug?.timingsMs?.["firstToken"] as number | null | undefined) ?? null} ragCache={lastDebug?.cache ?? null} ragMs={lastDebug?.timingsMs ? (Number(lastDebug.timingsMs["embed"] ?? 0) + Number(lastDebug.timingsMs["retrieve"] ?? 0)) : null} ttsTtfaMs={speech.ttfaMs} ttsTtfbMs={speech.ttfbMs} droppedPackets={droppedPackets} persona={prefs.persona} detected={detected} lock={prefs.lock} bridge={lastDebug?.bridge ? { ...lastDebug.bridge, matched: (lastDebug.candidates ?? []).filter((c) => c.kept).map((c) => c.title) } : null} delimiter={speech.delimiter} swaps={speech.swaps} />
           {dispatches.length > 0 && (
-            <div className="mb-2 flex flex-wrap items-center gap-1 font-mono text-[11px]">
-              <span className="text-muted-foreground">open in portfolio:</span>
+            <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.08em]">
+              <span className="text-muted-foreground">Open in portfolio:</span>
               {dispatches.slice(-3).map((d) => (
-                <a key={d.at + d.href} href={d.href} target={inCall ? "_blank" : undefined} rel="noreferrer" className="border border-border px-1.5 py-0.5 text-primary hover:border-primary">{actionLabel(d.action)} ↗</a>
+                <a key={d.at + d.href} href={d.href} target={inCall ? "_blank" : undefined} rel="noreferrer" className="inline-flex min-h-11 items-center border border-hairline bg-card px-3 text-signal transition-colors hover:border-signal">{actionLabel(d.action)} ↗</a>
               ))}
             </div>
           )}
           {!inCall && voice.endReason && (
-            <div role="status" className="mb-2 flex items-center gap-3 border border-border bg-card px-3 py-2 font-mono text-xs">
+            <div role="status" className="mb-3 flex flex-wrap items-center gap-3 border border-hairline bg-card px-4 py-3 font-mono text-[11px]">
               <span className="text-muted-foreground">{voice.endReason === "idle" ? "Call paused after 15s of silence." : "5-minute voice limit reached."}</span>
-              <button type="button" onClick={startCall} className="ml-auto border border-primary px-2 py-0.5 text-primary hover:bg-primary hover:text-primary-foreground">resume call</button>
+              <button type="button" onClick={startCall} className="ml-auto min-h-11 rounded-full border border-signal px-4 text-signal transition-colors hover:bg-primary hover:text-primary-foreground">resume call</button>
             </div>
           )}
           {(inCall || voice.error) && (
-            <div className="mb-2 rounded-xl border border-primary/40 bg-card p-3">
-              {inCall && <div className="float-right ml-3"><VoiceOrb telemetry={voice.telemetry} active={voice.status === "connected"} retrievingRef={retrievingRef} /></div>}
-              <div className="flex items-center gap-2 font-mono text-xs">
-                <span className={`inline-block h-2 w-2 rounded-full ${voice.status === "connected" ? "animate-pulse bg-primary" : "bg-muted-foreground"}`} />
-                <span className="text-muted-foreground">{voice.status === "connected" ? (voice.muted ? "voice call · muted" : "voice call · listening — just talk, interrupt anytime") : voice.status === "connecting" ? "connecting voice…" : voice.status === "stopping" ? "ending call…" : "voice call ended"}</span>
-                {voice.status === "connected" && (
-                  <button type="button" onClick={() => voice.setMuted(!voice.muted)} className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:text-foreground">{voice.muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}{voice.muted ? "unmute" : "mute"}</button>
-                )}
-                {voice.status === "connected" && (
-                  <button type="button" onClick={() => voice.setOutputMuted(!voice.outputMuted)} aria-pressed={voice.outputMuted} className="flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:text-foreground">{voice.outputMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}{voice.outputMuted ? "voice off" : "voice on"}</button>
-                )}
-                {inCall && (
-                  <button type="button" onClick={voice.stop} disabled={voice.status === "stopping"} className={`${voice.status === "connected" ? "" : "ml-auto "}flex items-center gap-1 rounded-md bg-destructive px-2 py-1 text-destructive-foreground disabled:opacity-50`}><PhoneOff className="h-3.5 w-3.5" />end</button>
-                )}
-              </div>
-              {voice.playbackBlocked && <button type="button" onClick={voice.resumePlayback} className="mt-2 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">Tap to hear the assistant</button>}
-              {voice.error && <p role="alert" className="mt-2 text-xs text-destructive">{voice.error}</p>}
-              {captions.length > 0 && (
-                <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-sm">
-                  {captions.map((c, i) => <p key={i} className={c.role === "user" ? "text-muted-foreground" : "text-foreground"}><span className="font-mono text-xs text-primary">{c.role === "user" ? "you › " : "ai › "}</span>{c.text}{c.interrupted && <span className="ml-1 font-mono text-xs text-muted-foreground">— interrupted</span>}</p>)}
+            <div className="voice-console mb-3 overflow-hidden border border-signal/35 bg-card shadow-[0_18px_70px_-40px_var(--signal)]">
+              <div className="h-0.5 bg-gradient-to-r from-signal via-signal/30 to-transparent" />
+              <div className="flex flex-col gap-4 p-3 sm:flex-row sm:items-center sm:p-4">
+                {inCall && <div className="flex shrink-0 justify-center"><VoiceOrb telemetry={voice.telemetry} active={voice.status === "connected"} retrievingRef={retrievingRef} /></div>}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.08em]">
+                    <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${voice.status === "connected" ? "animate-pulse bg-signal motion-reduce:animate-none" : "bg-muted-foreground"}`} aria-hidden="true" />
+                    <span role="status" className="max-w-full leading-relaxed text-muted-foreground">{voice.status === "connected" ? (voice.muted ? "voice call · muted" : "voice call · listening — interrupt anytime") : voice.status === "connecting" ? "connecting voice…" : voice.status === "stopping" ? "ending call…" : "voice call ended"}</span>
+                    <div className="flex w-full flex-wrap items-center gap-2 pt-1 min-[420px]:ml-auto min-[420px]:w-auto min-[420px]:pt-0">
+                      {voice.status === "connected" && (
+                        <button type="button" onClick={() => voice.setMuted(!voice.muted)} aria-pressed={voice.muted} className="flex min-h-11 items-center gap-1.5 rounded-full border border-hairline px-3 text-muted-foreground transition-colors hover:border-signal hover:text-foreground">{voice.muted ? <MicOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Mic className="h-3.5 w-3.5" aria-hidden="true" />}{voice.muted ? "unmute" : "mute"}</button>
+                      )}
+                      {voice.status === "connected" && (
+                        <button type="button" onClick={() => voice.setOutputMuted(!voice.outputMuted)} aria-pressed={voice.outputMuted} className="flex min-h-11 items-center gap-1.5 rounded-full border border-hairline px-3 text-muted-foreground transition-colors hover:border-signal hover:text-foreground">{voice.outputMuted ? <VolumeX className="h-3.5 w-3.5" aria-hidden="true" /> : <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />}{voice.outputMuted ? "voice off" : "voice on"}</button>
+                      )}
+                      {inCall && (
+                        <button type="button" onClick={voice.stop} disabled={voice.status === "stopping"} className="flex min-h-11 items-center gap-1.5 rounded-full bg-destructive px-3 text-destructive-foreground disabled:opacity-50"><PhoneOff className="h-3.5 w-3.5" aria-hidden="true" />end</button>
+                      )}
+                    </div>
+                  </div>
+                  {voice.playbackBlocked && <button type="button" onClick={voice.resumePlayback} className="mt-3 min-h-11 w-full bg-primary px-4 text-xs font-semibold text-primary-foreground min-[420px]:w-auto">Tap to hear the assistant</button>}
+                  {voice.error && <p role="alert" className="mt-3 text-sm leading-relaxed text-destructive">{voice.error}</p>}
+                  {captions.length > 0 && (
+                    <div aria-label="Live call captions" className="chat-scroll mt-3 max-h-36 space-y-2 overflow-y-auto border-t border-hairline pt-3 text-sm leading-relaxed">
+                      {captions.map((c, i) => <p key={i} className={c.role === "user" ? "text-muted-foreground" : "text-foreground"}><span className="font-mono text-[10px] uppercase text-signal">{c.role === "user" ? "you › " : "ai › "}</span>{c.text}{c.interrupted && <span className="ml-1 font-mono text-[10px] text-muted-foreground">— interrupted</span>}</p>)}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
-          {recError && <p role="alert" className="mb-2 text-xs text-destructive">{recError}</p>}
-          {speech.error && <p role="alert" className="mb-2 text-xs text-destructive">{speech.error}</p>}
-          <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 focus-within:border-primary/60">
+          {recError && <p role="alert" className="mb-2 border-l-2 border-destructive pl-3 text-sm text-destructive">{recError}</p>}
+          {speech.error && <p role="alert" className="mb-2 border-l-2 border-destructive pl-3 text-sm text-destructive">{speech.error}</p>}
+          <div className="composer-shell flex items-end gap-1.5 border border-input bg-card p-2 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.8)] transition-colors focus-within:border-signal sm:gap-2">
             <textarea
               ref={taRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
               rows={1}
-              placeholder={rec === "recording" ? "Recording… tap the mic to finish" : rec === "transcribing" ? "Transcribing…" : "Ask about experience, projects, stack…"}
-              className="max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground"
+              aria-label="Message Daniyal's AI"
+              placeholder={rec === "recording" ? "Recording… tap the mic to finish" : rec === "transcribing" ? "Transcribing…" : "Ask Daniyal…"}
+              className="max-h-40 min-w-0 flex-1 resize-none bg-transparent px-2 py-2.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground sm:text-sm"
             />
-            <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${rec === "recording" ? "animate-pulse bg-destructive text-destructive-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label={rec === "recording" ? "Stop recording" : "Record a question"} title="Record a question" onClick={toggleRecord} disabled={rec === "transcribing" || status !== "idle" || inCall} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-40 ${rec === "recording" ? "animate-pulse border-destructive bg-destructive text-destructive-foreground" : "border-hairline text-muted-foreground hover:border-signal hover:text-signal"}`}>
               {rec === "transcribing" ? <Loader2 className="h-4 w-4 animate-spin" /> : rec === "recording" ? <Square className="h-3.5 w-3.5" /> : <Mic className="h-4 w-4" />}
             </button>
-            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={startCall} disabled={inCall || rec !== "idle"} className={`flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${inCall ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:text-primary"}`}>
+            <button type="button" aria-label="Start voice chat" title="Real-time voice chat" onClick={startCall} disabled={inCall || rec !== "idle"} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-40 ${inCall ? "border-signal bg-primary text-primary-foreground" : "border-hairline text-muted-foreground hover:border-signal hover:text-signal"}`}>
               <AudioLines className="h-4 w-4" />
             </button>
             {status === "idle" ? (
-              <button type="submit" aria-label="Send" disabled={!input.trim()} className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
+              <button type="submit" aria-label="Send" disabled={!input.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105 disabled:scale-100 disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
             ) : (
-              <button type="button" aria-label="Stop" onClick={() => abortRef.current?.abort()} className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground"><Square className="h-3.5 w-3.5" /></button>
+              <button type="button" aria-label="Stop" onClick={() => abortRef.current?.abort()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-signal bg-secondary text-signal"><Square className="h-3.5 w-3.5" /></button>
             )}
           </div>
+          <p className="mt-2 hidden text-center font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground sm:block">Enter to send · Shift + Enter for a new line · grounded answers, not invented claims</p>
         </form>
       </div>
 
       {panel && active && <InspectPanel m={active} tab={panel.tab} focus={panel.focus} setTab={(tab) => setPanel({ ...panel, tab })} onClose={() => setPanel(null)} />}
-    </div>
-  );
-}
-
-function AssistantMessage({ m, onCite, onDev, onSpeak, speakState, speakDisabled }: {
-  m: Msg;
-  onCite: (n: number) => void;
-  onDev: () => void;
-  onSpeak: () => void;
-  speakState: "idle" | "loading" | "playing";
-  speakDisabled: boolean;
-}) {
-  const md = m.content.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)");
-  const canSpeak = m.content.trim().length > 0;
-  return (
-    <div className="space-y-2">
-      <div className="prose-chat text-[15px] leading-relaxed">
-        <ReactMarkdown
-          components={{
-            a: ({ href, children }) => {
-              const n = href?.startsWith("#cite-") ? Number(href.slice(6)) : null;
-              if (n == null) return <a href={href} target="_blank" rel="noreferrer" className="text-primary underline">{children}</a>;
-              const src = m.sources?.find((s) => s.n === n);
-              return (
-                <button type="button" onClick={() => onCite(n)} title={src?.title} className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded bg-accent px-1 align-text-top font-mono text-[11px] font-bold text-accent-foreground hover:bg-primary hover:text-primary-foreground">
-                  {n}
-                </button>
-              );
-            },
-          }}
-        >
-          {md}
-        </ReactMarkdown>
-      </div>
-      {m.error && <p className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">{m.error}</p>}
-      {(canSpeak || m.sources?.length || m.debug) && (
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          {canSpeak && (
-            <button
-              type="button"
-              onClick={onSpeak}
-              disabled={speakDisabled && speakState === "idle"}
-              aria-label={speakState === "playing" ? "Stop playing this answer" : "Listen to this answer"}
-              title={speakState === "playing" ? "Stop" : "Listen to this answer"}
-              className={`flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs transition-colors disabled:opacity-40 ${speakState === "playing" ? "border-primary bg-accent text-accent-foreground" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}
-            >
-              {speakState === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : speakState === "playing" ? <Pause className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-              {speakState === "loading" ? "readying…" : speakState === "playing" ? "stop" : "listen"}
-            </button>
-          )}
-          {m.sources?.map((s) => (
-            <button key={s.n} onClick={() => onCite(s.n)} className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 font-mono text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground">
-              <span className="text-primary">[{s.n}]</span> <span className="max-w-[180px] truncate">{s.title}</span>
-            </button>
-          ))}
-          <button onClick={onDev} className="flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-muted-foreground hover:text-primary"><Bug className="h-3.5 w-3.5" />inspect</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function InspectPanel({ m, tab, focus, setTab, onClose }: { m: Msg; tab: "sources" | "dev"; focus?: number | undefined; setTab: (t: "sources" | "dev") => void; onClose: () => void }) {
-  const focusRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { focusRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [focus, tab]);
-  const d = m.debug;
-  return (
-    <aside className="fixed inset-0 z-20 flex flex-col border-l border-border bg-sidebar lg:static lg:w-[420px]">
-      <div className="flex items-center gap-1 border-b border-border p-2">
-        {(["sources", "dev"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-xs ${tab === t ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-            {t === "sources" ? <FileText className="h-3.5 w-3.5" /> : <Bug className="h-3.5 w-3.5" />}{t === "sources" ? "sources" : "dev mode"}
-          </button>
-        ))}
-        <button aria-label="Close" onClick={onClose} className="ml-auto rounded p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-      </div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {tab === "sources" ? (
-          m.sources?.length ? m.sources.map((s) => (
-            <div key={s.n} ref={s.n === focus ? focusRef : undefined} className={`rounded-lg border p-3 ${s.n === focus ? "border-primary" : "border-border"} bg-card`}>
-              <div className="flex items-center gap-2 font-mono text-xs"><span className="text-primary">[{s.n}]</span><span className="text-muted-foreground">{s.section}</span></div>
-              <p className="mt-1 text-sm font-semibold">{s.title}</p>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.text}</p>
-              <p className="mt-2 font-mono text-[10px] text-muted-foreground">id: {s.id}</p>
-            </div>
-          )) : <p className="text-sm text-muted-foreground">No sources were retrieved.</p>
-        ) : (
-          <div className="space-y-4 font-mono text-xs">
-            <Kv k="model" v={d?.model ?? "—"} />
-            <Kv k="retrieval query" v={d?.query ?? "—"} />
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(d?.timingsMs ?? {}).map(([k, v]) => <Kv key={k} k={`${k} ms`} v={String(v ?? "—")} />)}
-            </div>
-            {d?.usage != null && <Kv k="tokens" v={JSON.stringify(d.usage)} />}
-            <div>
-              <p className="mb-2 text-muted-foreground">hybrid ranking · BM25 + dense → RRF (k=60)</p>
-              <table className="w-full">
-                <thead className="text-muted-foreground"><tr><th className="py-1 text-left">chunk</th><th>bm25</th><th>dense</th><th>rrf</th></tr></thead>
-                <tbody>
-                  {d?.candidates?.map((c) => (
-                    <tr key={c.id} className={c.kept ? "text-foreground" : "text-muted-foreground/60"}>
-                      <td className="max-w-[150px] truncate py-1" title={c.title}>{c.kept ? "● " : "○ "}{c.id}</td>
-                      <td className="text-center">{c.bm25}<span className="text-muted-foreground"> #{c.bm25Rank ?? "-"}</span></td>
-                      <td className="text-center">{c.dense}<span className="text-muted-foreground"> #{c.denseRank ?? "-"}</span></td>
-                      <td className="text-center text-primary">{c.rrf}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="mt-2 text-muted-foreground">● passed relevance gate and sent to the model</p>
-            </div>
-          </div>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-function Kv({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="rounded-md border border-border bg-card p-2">
-      <p className="text-muted-foreground">{k}</p>
-      <p className="mt-0.5 break-words text-foreground">{v}</p>
     </div>
   );
 }

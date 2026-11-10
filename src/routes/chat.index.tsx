@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { Loader2 } from "lucide-react";
 import { createThread, listThreads } from "@/lib/chat.functions";
 import { getVisitorId } from "@/lib/visitor";
 
@@ -28,5 +29,14 @@ function ChatIndex() {
       navigate({ to: "/chat/$threadId", params: { threadId: id }, replace: true });
     })();
   }, [navigate]);
-  return <div className="flex h-full items-center justify-center font-mono text-sm text-muted-foreground">booting assistant…</div>;
+  return (
+    <div className="assistant-boot" role="status">
+      <span className="assistant-boot__mark" aria-hidden="true">d</span>
+      <Loader2 className="h-4 w-4 animate-spin text-signal motion-reduce:animate-none" aria-hidden="true" />
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Opening your private session</h1>
+        <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em]">Restoring cited conversations…</p>
+      </div>
+    </div>
+  );
 }
