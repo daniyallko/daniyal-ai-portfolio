@@ -64,7 +64,10 @@ export function VoiceSwitcher(props: {
       const top = r.bottom + 8;
       setPos({
         top,
-        right: Math.max(8, window.innerWidth - r.right),
+        right: Math.min(
+          Math.max(16, window.innerWidth - r.right),
+          Math.max(16, window.innerWidth - Math.min(360, window.innerWidth - 32) - 16),
+        ),
         maxH: Math.max(240, vh - top - 12),
       });
     };
