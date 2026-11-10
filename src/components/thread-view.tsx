@@ -318,6 +318,10 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
     else endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, status]);
   useEffect(() => {
+    const el = captionsRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [captions]);
+  useEffect(() => {
     if (status === "idle" && (!embed || embed.active)) taRef.current?.focus();
   }, [status, loaded, embed?.active]); // eslint-disable-line react-hooks/exhaustive-deps
 
