@@ -163,5 +163,5 @@ export function AssistantMessage({
 export function linkifyContacts(text: string): string {
   return text
     .replace(/(?<![[(:])daniyallko@gmail\.com(?![\]])/g, "[daniyallko@gmail.com](mailto:daniyallko@gmail.com)")
-    .replace(/(?<![[(:\d])\+?91[\s-]?7007[\s-]?644[\s-]?677(?![\]\d])/g, "[+91 7007644677](tel:+917007644677)");
+    .replace(/(?<![[(:+\d])\+?91[\s-]?7007[\s-]?644[\s-]?677(?![\]\d])/g, "[+91 7007644677](tel:+917007644677)");
 }
