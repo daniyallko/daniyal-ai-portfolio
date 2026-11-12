@@ -1,0 +1,1 @@
+REVOKE ALL ON public.api_rate_limits FROM PUBLIC, anon, authenticated;
