@@ -70,6 +70,8 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
   const abortRef = useRef<AbortController | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const captionsRef = useRef<HTMLDivElement>(null);
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
   const [recError, setRecError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -311,10 +313,14 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
   }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-    });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    else endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, status]);
+  useEffect(() => {
+    const el = captionsRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [captions]);
   useEffect(() => {
     if (status === "idle" && (!embed || embed.active)) taRef.current?.focus();
   }, [status, loaded, embed?.active]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -569,13 +575,14 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
                     `preview:${p.id}`,
                     previewLine(activeLang ?? "en", p.gender === "female"),
                     { voice: p.ttsVoice, lang: activeLang ?? "en" },
+                    { src: `/voice-previews/${p.id}-${activeLang ?? "en"}.mp3` },
                   );
               }}
             />
           </div>
         </header>
 
-        <div className="chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div ref={scrollRef} className="chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-7 sm:px-6 sm:py-10">
             {loaded === "ok" && messages.length === 0 && (
               <section className="chat-empty pt-6 sm:pt-12" aria-labelledby="empty-chat-title">
@@ -823,6 +830,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
                   )}
                   {captions.length > 0 && (
                     <div
+                      ref={captionsRef}
                       aria-label="Live call captions"
                       className="chat-scroll mt-3 max-h-36 space-y-2 overflow-y-auto border-t border-hairline pt-3 text-sm leading-relaxed"
                     >
@@ -845,6 +853,15 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
                         </p>
                       ))}
                     </div>
+                  )}
+                  {captions.some((c) => /\b(resume|résumé|cv|curriculum)\b/i.test(c.text)) && (
+                    <a
+                      href="/api/public/resume"
+                      download
+                      className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-sm border border-primary px-3 font-mono text-xs text-signal transition-colors hover:bg-primary hover:text-primary-foreground"
+                    >
+                      ↓ Download resume
+                    </a>
                   )}
                 </div>
               </div>

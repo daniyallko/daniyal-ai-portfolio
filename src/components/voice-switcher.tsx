@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, Languages, Loader2, LockKeyhole, Square, Volume2 } from "lucide-react";
 import {
   VOICE_PERSONAS,
@@ -52,10 +53,37 @@ export function VoiceSwitcher(props: {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number; maxH: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const vh = window.innerHeight;
+      const top = r.bottom + 8;
+      setPos({
+        top,
+        right: Math.min(
+          Math.max(16, window.innerWidth - r.right),
+          Math.max(16, window.innerWidth - Math.min(360, window.innerWidth - 32) - 16),
+        ),
+        maxH: Math.max(240, vh - top - 12),
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (!ref.current?.contains(t) && !popRef.current?.contains(t)) setOpen(false);
     };
     const esc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -103,12 +131,14 @@ export function VoiceSwitcher(props: {
           aria-hidden="true"
         />
       </button>
-      {open && (
+      {open && pos && typeof document !== "undefined" && createPortal(
         <div
+          ref={popRef}
+          style={{ top: pos.top, right: pos.right, maxHeight: Math.min(pos.maxH, 560) }}
           id="voice-language-popover"
           role="dialog"
           aria-label="Voice and language"
-          className="voice-popover absolute right-0 top-full z-40 mt-2 max-h-[min(70dvh,560px)] w-[min(360px,calc(100vw-2rem))] overflow-y-auto border border-hairline bg-card shadow-2xl"
+          className="voice-popover fixed z-[100] w-[min(360px,calc(100vw-2rem))] overflow-y-auto overscroll-contain border border-hairline bg-card shadow-2xl"
         >
           <div className="border-b border-hairline px-4 py-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal">
@@ -204,7 +234,8 @@ export function VoiceSwitcher(props: {
               ))}
             </select>
           </label>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

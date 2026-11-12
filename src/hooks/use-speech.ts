@@ -57,7 +57,7 @@ export function useSpeech(config: SpeechVoice) {
       key: string,
       text: string,
       override?: Override,
-      opts: { force?: boolean; prepared?: boolean } = {},
+      opts: { force?: boolean; prepared?: boolean; src?: string } = {},
     ) => {
       if (idRef.current === key && !opts.force) {
         stop();
@@ -125,6 +125,24 @@ export function useSpeech(config: SpeechVoice) {
       try {
         ttfaRef.current = null;
         ttfbRef.current = null;
+        if (opts.src) {
+          // Pre-recorded clip: play instantly; fall through to live synthesis if it fails.
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const audio = new Audio(opts.src);
+              audioRef.current = audio;
+              audio.onended = () => resolve();
+              audio.onerror = () => reject(new Error("missing"));
+              audio.play().then(() => {
+                if (token === tokenRef.current) setState("playing");
+              }, reject);
+            });
+            if (token === tokenRef.current) stop();
+            return;
+          } catch {
+            if (token !== tokenRef.current) return;
+          }
+        }
         const firstP = fetchWav(first);
         const restP = rest ? fetchWav(rest) : null;
         restP?.catch(() => {});

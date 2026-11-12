@@ -86,6 +86,7 @@ describe("Noir motion and reduced-data safeguards", () => {
 
   it("honors reduced motion for every programmatic smooth scroll", () => {
     for (const source of [thread, home]) {
+      if (!source.includes('"smooth"')) continue; // instant scrolling needs no reduced-motion guard
       expect(source).toContain(
         'window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"',
       );

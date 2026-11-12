@@ -23,6 +23,7 @@ import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as ChatThreadIdRouteImport } from './routes/chat.$threadId'
 import { Route as ApiPublicRagWarmRouteImport } from './routes/api/public/rag-warm'
+import { Route as ApiPublicResumeRouteImport } from './routes/api/public/resume'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -93,6 +94,11 @@ const ApiPublicRagWarmRoute = ApiPublicRagWarmRouteImport.update({
   path: '/api/public/rag-warm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicResumeRoute = ApiPublicResumeRouteImport.update({
+  id: '/api/public/resume',
+  path: '/api/public/resume',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/chat/': typeof ChatIndexRoute
   '/api/public/rag-warm': typeof ApiPublicRagWarmRoute
+  '/api/public/resume': typeof ApiPublicResumeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/chat': typeof ChatIndexRoute
   '/api/public/rag-warm': typeof ApiPublicRagWarmRoute
+  '/api/public/resume': typeof ApiPublicResumeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/chat/': typeof ChatIndexRoute
   '/api/public/rag-warm': typeof ApiPublicRagWarmRoute
+  '/api/public/resume': typeof ApiPublicResumeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/chat/'
     | '/api/public/rag-warm'
+    | '/api/public/resume'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/chat'
     | '/api/public/rag-warm'
+    | '/api/public/resume'
   id:
     | '__root__'
     | '/'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/chat/'
     | '/api/public/rag-warm'
+    | '/api/public/resume'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   ApiSpeakRoute: typeof ApiSpeakRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiPublicRagWarmRoute: typeof ApiPublicRagWarmRoute
+  ApiPublicResumeRoute: typeof ApiPublicResumeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -302,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRagWarmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/resume': {
+      id: '/api/public/resume'
+      path: '/api/public/resume'
+      fullPath: '/api/public/resume'
+      preLoaderRoute: typeof ApiPublicResumeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -340,6 +360,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeakRoute: ApiSpeakRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiPublicRagWarmRoute: ApiPublicRagWarmRoute,
+  ApiPublicResumeRoute: ApiPublicResumeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

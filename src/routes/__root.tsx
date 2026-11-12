@@ -14,6 +14,7 @@ import { ArrowLeft, ArrowUpRight, RotateCcw } from "lucide-react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AmbientCursorGlow } from "@/components/ambient-cursor-glow";
+import { AmbientCritters } from "@/components/ambient-critters";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { themeInitScript } from "@/lib/theme";
@@ -171,7 +172,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
     ],
   }),
   shellComponent: RootShell,
@@ -241,6 +242,7 @@ function RootComponent() {
       <ThemeProvider>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <AmbientCursorGlow />
+        <AmbientCritters />
         <Outlet />
       </ThemeProvider>
     </QueryClientProvider>

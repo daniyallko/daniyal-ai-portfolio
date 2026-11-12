@@ -141,6 +141,13 @@ function Index() {
               >
                 Stack
               </a>
+              <a
+                href="/api/public/resume"
+                download
+                className="flex min-h-11 items-center px-2 py-2 transition-colors hover:text-foreground"
+              >
+                Resume
+              </a>
               <ThemeToggle />
               <button
                 type="button"

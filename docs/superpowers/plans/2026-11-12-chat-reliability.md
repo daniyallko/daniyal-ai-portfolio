@@ -54,7 +54,7 @@
 ### Task 2: Atomic API rate limits
 
 **Files:**
-- Create: `drizzle/migrations/0005_chat_reliability.sql`
+- Create: `drizzle/migrations/0006_chat_reliability.sql`
 - Create: `drizzle/migrations/meta/0005_snapshot.json`
 - Modify: `drizzle/migrations/meta/_journal.json`
 - Modify: `src/integrations/supabase/types.ts`
