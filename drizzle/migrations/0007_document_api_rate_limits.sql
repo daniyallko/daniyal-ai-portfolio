@@ -1,0 +1,1 @@
+COMMENT ON TABLE public.api_rate_limits IS 'Server-only fixed-window rate limit buckets; accessed via consume_rate_limit().';
