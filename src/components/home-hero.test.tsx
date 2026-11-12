@@ -74,11 +74,11 @@ describe("HomeHero", () => {
     const suggestions = [
       [
         "System architecture",
-        { q: "Walk me through the architecture of AI BotKit's RAG pipeline." },
+        { q: "How does AI BotKit's RAG pipeline work?" },
       ],
-      ["Featured projects", { q: "What are Daniyal's most impressive projects?" }],
+      ["Best projects", { q: "What are Daniyal's best projects?" }],
       ["Start voice intro", { call: true }],
-      ["Résumé & availability", { q: "Summarize his experience and availability for new roles." }],
+      ["Availability", { q: "Is Daniyal available immediately? What is his notice period?" }],
     ] as const;
 
     for (const [label, request] of suggestions) {
