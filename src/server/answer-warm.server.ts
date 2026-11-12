@@ -1,10 +1,9 @@
 import { streamResponse } from "@lovable.dev/ai-gateway";
 import { CHAT_MODEL as MODEL, CHAT_SYSTEM as SYSTEM } from "@/lib/prompt";
-import { answerKey, canShareAnswer, canonicalQuery, fingerprint } from "@/lib/rag-cache";
+import { answerKey, canShareAnswer, canonicalQuery, corpusVersion, fingerprint } from "@/lib/rag-cache";
 import { detectLanguage, replyLanguageHint } from "@/lib/language";
 import { detectLanguageAndRegister } from "@/lib/multilingualVoiceEngine";
 import { detectActions } from "@/lib/voice-logic";
-import { corpusVersion } from "@/lib/rag-cache";
 import { makeEntry, persistCache, readCache } from "./rag-cache.server";
 import { retrieve } from "./rag.server";
 

@@ -101,7 +101,11 @@ async function reindex() {
   const t0 = Date.now();
   await warmCorpus(true);
   const { buildChunks } = await import("@/lib/portfolio");
-  return { chunks: buildChunks().length, ms: Date.now() - t0 };
+  // Re-answer the recruiter questions for the new content so first visitors get instant replies.
+  const { warmAnswers } = await import("@/server/answer-warm.server");
+  const { WARM_TIER1, WARM_TIER2 } = await import("@/lib/warm-questions");
+  const answers = await warmAnswers([...WARM_TIER1, ...WARM_TIER2], 6);
+  return { chunks: buildChunks().length, ms: Date.now() - t0, answers };
 }
 
 export const adminListKb = createServerFn({ method: "POST" })
