@@ -80,6 +80,7 @@ export type Project = {
   blurb: string;
   details: string;
   tags: string[];
+  flow?: string[];
   featured?: boolean;
 };
 
@@ -92,6 +93,12 @@ export const projects: Project[] = [
     details:
       "Scans a customer's website and documents, builds a knowledge base, and embeds a chat widget with one JavaScript snippet. Pinecone hybrid search (dense + sparse), cross-encoder reranking, relevance gating with query reformulation, LangGraph agentic engine with tool calling, PostgreSQL checkpointed memory with summarization, a strict grounding policy with an honest fallback and human handover, OpenAI and Gemini, LangSmith tracing, WhatsApp/Telegram channels and multilingual Whisper voice.",
     tags: ["LangGraph", "Pinecone", "FastAPI", "Reranking", "Whisper"],
+    flow: [
+      "Website + documents",
+      "Hybrid retrieval + reranking",
+      "LangGraph agent + memory",
+      "Web, WhatsApp, Telegram + voice",
+    ],
     featured: true,
   },
   {
@@ -102,6 +109,7 @@ export const projects: Project[] = [
     details:
       "Owns uptime, speed, servers, license sales and activation end to end. Migrated 10,000+ users and subscriptions between Stripe accounts with zero downtime, and built a one-click upgrade plugin that charges the saved card and upgrades the license with no checkout.",
     tags: ["Kubernetes", "Stripe", "PHP", "Infra"],
+    flow: ["License sale", "Stripe subscription", "Activation + upgrades"],
   },
   {
     id: "voice-agent",
@@ -111,6 +119,7 @@ export const projects: Project[] = [
     details:
       "Combines speech-to-text, an LLM, and text-to-speech in a streaming pipeline for live spoken conversations.",
     tags: ["STT", "LLM", "TTS", "Streaming"],
+    flow: ["Speech-to-text", "Streaming LLM", "Text-to-speech"],
   },
   {
     id: "multi-agent",
@@ -120,6 +129,7 @@ export const projects: Project[] = [
     details:
       "A chatbot where several AI agents coordinate via agent orchestration and tool calling to handle user requests.",
     tags: ["Orchestration", "Tool calling", "Agents"],
+    flow: ["User request", "Agent orchestration", "Tool calling", "Coordinated response"],
   },
 ];
 

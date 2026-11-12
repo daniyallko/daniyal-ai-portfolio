@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { profile, stats, experience, projects, skills, education } from "@/lib/portfolio";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HomeHero } from "@/components/home-hero";
+import { CountUp } from "@/components/count-up";
+import { ProjectFlow } from "@/components/project-flow";
 import { useInlineAssistant } from "@/hooks/use-inline-assistant";
 
 export const Route = createFileRoute("/")({
@@ -54,6 +56,20 @@ function useReveal() {
   }, []);
 }
 
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return reduced;
+}
+
 // Co-browsing actions from the assistant: /?hl=<element id> or /?skill=<tech>.
 function useCoBrowse() {
   useEffect(() => {
@@ -101,6 +117,11 @@ function Index() {
   const featured = projects.find((p) => p.featured)!;
   const others = projects.filter((p) => !p.featured);
   const assistant = useInlineAssistant();
+  const reducedMotion = useReducedMotion();
+  const askProject = (name: string) =>
+    assistant.go({ q: `Tell me about Daniyal's ${name} project.` });
+  const askGroup = (group: string) =>
+    assistant.go({ q: `Tell me about Daniyal's experience with ${group}.` });
   return (
     <>
       {assistant.node}
@@ -111,7 +132,7 @@ function Index() {
       >
         <header className="safe-top sticky top-0 z-30 border-b border-hairline bg-background/80 backdrop-blur-xl">
           <div className="mx-auto flex max-w-[90rem] items-center justify-between gap-3 px-5 pb-3 text-sm sm:px-8 xl:px-12">
-            <a href="#top" className="flex min-h-11 min-w-0 items-center gap-2.5">
+            <a href="#top" className="flex min-h-11 min-w-11 items-center gap-2.5">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border border-hairline bg-card font-serif text-lg italic text-signal">
                 d
               </span>
@@ -162,7 +183,7 @@ function Index() {
         </header>
 
         <main id="top" className="relative z-10">
-          <HomeHero onOpen={assistant.go} />
+          <HomeHero onOpen={assistant.go} assistantOpen={assistant.open} />
           <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:border-x lg:border-hairline">
             <section
               aria-label="Career statistics"
@@ -178,7 +199,7 @@ function Index() {
                     0{i + 1}
                   </span>
                   <p className="tnum mt-5 text-[clamp(2.4rem,4vw,4rem)] font-semibold leading-none tracking-[-0.055em]">
-                    {s.value}
+                    <CountUp value={s.value} reducedMotion={reducedMotion} />
                   </p>
                   <p className="mt-3 max-w-[18ch] text-sm leading-snug text-muted-foreground">
                     {s.label}
@@ -214,11 +235,20 @@ function Index() {
                   <p className="mt-7 max-w-[38ch] text-lg leading-snug text-foreground/90">
                     {featured.blurb}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => askProject(featured.name)}
+                    aria-label={`Ask about ${featured.name}`}
+                    className="mt-7 flex min-h-11 items-center gap-2 rounded-full border border-hairline px-4 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-signal"
+                  >
+                    Ask about {featured.name} <span aria-hidden="true">↗</span>
+                  </button>
                 </div>
                 <div className="relative md:border-l md:border-hairline md:pl-8 lg:pl-12">
                   <p className="text-[15px] leading-relaxed text-muted-foreground">
                     {featured.details}
                   </p>
+                  {featured.flow && <ProjectFlow steps={featured.flow} />}
                   <Tags tags={featured.tags} />
                 </div>
               </article>
@@ -243,7 +273,16 @@ function Index() {
                     <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
                       {p.blurb}
                     </p>
+                    {p.flow && <ProjectFlow steps={p.flow} />}
                     <Tags tags={p.tags.slice(0, 3)} />
+                    <button
+                      type="button"
+                      onClick={() => askProject(p.name)}
+                      aria-label={`Ask about ${p.name}`}
+                      className="mt-5 flex min-h-11 items-center justify-between border-t border-hairline pt-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Ask about this project <span aria-hidden="true">↗</span>
+                    </button>
                   </article>
                 ))}
               </div>
@@ -318,6 +357,14 @@ function Index() {
                         </li>
                       ))}
                     </ul>
+                    <button
+                      type="button"
+                      onClick={() => askGroup(s.group)}
+                      aria-label={`Ask about ${s.group}`}
+                      className="mt-5 flex min-h-11 w-full items-center justify-between border-t border-hairline pt-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Ask about this group <span aria-hidden="true">↗</span>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -334,13 +381,13 @@ function Index() {
                   </p>
                   <a
                     href={`mailto:${profile.email}`}
-                    className="mt-5 inline-block max-w-full break-all text-[clamp(1.65rem,4vw,4rem)] font-medium leading-none tracking-[-0.045em] text-foreground underline decoration-hairline underline-offset-8 transition-colors hover:text-signal"
+                    className="mt-5 inline-flex min-h-11 max-w-full items-center break-all text-[clamp(1.65rem,4vw,4rem)] font-medium leading-none tracking-[-0.045em] text-foreground underline decoration-hairline underline-offset-8 transition-colors hover:text-signal"
                   >
                     {profile.email}
                   </a>
                   <p className="mt-6 text-sm text-foreground">{profile.availability}.</p>
                   <p className="mt-2 text-sm">
-                    <a href={`tel:${profile.phone.replace(/\s/g, "")}`} className="hover:text-signal">
+                    <a href={`tel:${profile.phone.replace(/\s/g, "")}`} className="inline-flex min-h-11 items-center hover:text-signal">
                       {profile.phone}
                     </a>{" "}
                     · {profile.location} · Speaks {profile.languages}

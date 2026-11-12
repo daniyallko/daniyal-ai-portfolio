@@ -1,21 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ArrowUpRight, AudioLines, Loader2, Mic, Square } from "lucide-react";
 import { profile } from "@/lib/portfolio";
-import { useTypewriter } from "@/lib/use-typewriter";
 import { VoiceSwitcher, useVoicePrefs } from "@/components/voice-switcher";
 import { useSpeech } from "@/hooks/use-speech";
 import { previewLine } from "@/lib/language";
-import { HeroBuilding } from "@/components/hero-building";
+import { HeroPortrait } from "@/components/hero-portrait";
 
 export type AssistantRequest = { q?: string; call?: boolean };
 
-const PROMPTS = [
-  "Ask anything about Daniyal's AI and engineering experience…",
-  "Tap Live Voice to talk to Daniyal's AI in real time…",
-  "Speak English, Hindi or Hinglish. Language is auto-detected…",
-  "Ask: “How does AI BotKit avoid hallucinations?”…",
-  "Ask: “Is Daniyal available immediately?”…",
-] as const;
+const PROMPT = "Ask about experience, projects, architecture, or availability…";
 
 const CREDS = [
   "Advanced RAG",
@@ -36,25 +29,20 @@ const CHIPS: { label: string; q?: string; call?: boolean }[] = [
   { label: "Availability", q: "Is Daniyal available immediately? What is his notice period?" },
 ];
 
-export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => void }) {
+export function HomeHero({
+  onOpen,
+  assistantOpen = false,
+}: {
+  onOpen: (request?: AssistantRequest) => void;
+  assistantOpen?: boolean;
+}) {
   const [input, setInput] = useState("");
-  const [focused, setFocused] = useState(false);
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
   const [err, setErr] = useState<string | null>(null);
-  const [reducedMotion, setReducedMotion] = useState(false);
   const recRef = useRef<MediaRecorder | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const prefs = useVoicePrefs();
   const speech = useSpeech({ voice: prefs.persona.ttsVoice, lang: prefs.lock });
-  const typed = useTypewriter(PROMPTS, !reducedMotion && !input && !focused && rec === "idle");
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReducedMotion(query.matches);
-    sync();
-    query.addEventListener?.("change", sync);
-    return () => query.removeEventListener?.("change", sync);
-  }, []);
 
   const go = (pending: AssistantRequest) => {
     speech.stop();
@@ -150,8 +138,7 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
 
   return (
     <section className="home-hero hero-exit relative flex min-h-[calc(100dvh-4.5rem)] flex-col justify-center overflow-hidden text-left">
-      <HeroBuilding />
-      <div className="relative z-10 mx-auto grid w-full max-w-[90rem] gap-10 px-5 py-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_10rem] lg:py-16 xl:px-12">
+      <div className="relative z-10 mx-auto grid w-full max-w-[90rem] gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.75fr)] lg:gap-4 lg:py-16 xl:px-12">
         <div className="hero-copy flex min-w-0 flex-col items-start">
           <p
             className="hero-enter flex items-center gap-2 rounded-full border border-hairline bg-background/55 px-3 py-1.5 font-mono text-[10px] tracking-[0.04em] text-muted-foreground backdrop-blur-md sm:text-[11px]"
@@ -189,8 +176,12 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
                 <button
                   type="button"
                   onClick={() => send(`Tell me about Daniyal's experience with ${c}.`)}
-                  className="min-h-9 rounded-md border border-hairline px-2.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                  className="group flex min-h-9 items-center gap-2 rounded-md px-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
                 >
+                  <span
+                    className="h-1 w-1 rounded-full bg-hairline transition-colors group-hover:bg-signal"
+                    aria-hidden="true"
+                  />
                   {c}
                 </button>
               </li>
@@ -211,8 +202,6 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
                 ref={taRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -221,26 +210,15 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
                 }}
                 rows={1}
                 aria-label="Ask about Daniyal"
-                placeholder={focused ? "Ask about experience, projects, stack…" : ""}
-                className="block max-h-40 w-full resize-none bg-transparent px-3 py-3.5 text-base outline-none placeholder:text-muted-foreground"
-              />
-              {!input && !focused && (
-                <p
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-3 top-3.5 truncate text-base text-muted-foreground"
-                >
-                  {rec === "recording"
+                placeholder={
+                  rec === "recording"
                     ? "Listening… tap the mic to finish"
                     : rec === "transcribing"
                       ? "Transcribing…"
-                      : reducedMotion
-                        ? PROMPTS[0]
-                        : typed}
-                  {rec === "idle" && !reducedMotion && (
-                    <span className="caret ml-px inline-block h-[1.05em] w-px translate-y-[3px] bg-primary" />
-                  )}
-                </p>
-              )}
+                      : PROMPT
+                }
+                className="block max-h-40 w-full resize-none bg-transparent px-3 py-3.5 text-base outline-none placeholder:text-muted-foreground"
+              />
             </div>
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-hairline px-1 pt-2">
               <div className="min-w-0 [&>div]:!ml-0">
@@ -283,7 +261,7 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
                   type="button"
                   onClick={() => go({ call: true })}
                   aria-label="Talk live with Daniyal's AI"
-                  className="breathe relative flex h-11 items-center gap-2 rounded-xl bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-px active:translate-y-px"
+                  className="relative flex h-11 items-center gap-2 rounded-xl bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-px active:translate-y-px"
                 >
                   <AudioLines className="h-4 w-4" />
                   <span className="hidden sm:inline">Talk live</span>
@@ -328,18 +306,21 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
             See the work <ArrowUpRight className="h-3.5 w-3.5 rotate-90" />
           </a>
         </div>
-        <aside
-          aria-hidden
-          className="hidden border-l border-white/15 pl-5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground lg:flex lg:flex-col lg:justify-between lg:py-2"
-        >
-          <div>
-            <span className="text-signal">01</span> / Portfolio
-          </div>
-          <div className="[writing-mode:vertical-rl]">Agentic systems · RAG · Voice</div>
-          <div>
-            2026 <span className="text-signal">↗</span>
-          </div>
-        </aside>
+        <div className="hero-visual relative min-h-[20rem] sm:min-h-[26rem] lg:min-h-[36rem]">
+          <HeroPortrait paused={assistantOpen} />
+          <aside
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 hidden border-l border-hairline pl-4 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground lg:flex lg:flex-col lg:justify-between lg:py-2"
+          >
+            <div>
+              <span className="text-signal">01</span> / Generic mesh
+            </div>
+            <div className="[writing-mode:vertical-rl]">Agentic systems · RAG · Voice</div>
+            <div>
+              2026 <span className="text-signal">↗</span>
+            </div>
+          </aside>
+        </div>
       </div>
     </section>
   );

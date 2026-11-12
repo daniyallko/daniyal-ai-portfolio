@@ -7,13 +7,16 @@ const mocks = vi.hoisted(() => ({
   speak: vi.fn(),
   setPersonaId: vi.fn(),
   setLock: vi.fn(),
-  typewriter: vi.fn(() => "Typed prompt"),
 }));
 
 vi.mock("@/hooks/use-speech", () => ({
   useSpeech: () => ({ id: null, state: "idle", error: null, speak: mocks.speak, stop: mocks.stop }),
 }));
-vi.mock("@/lib/use-typewriter", () => ({ useTypewriter: mocks.typewriter }));
+vi.mock("@/components/hero-portrait", () => ({
+  HeroPortrait: ({ paused = false }: { paused?: boolean }) => (
+    <div data-testid="hero-portrait" data-paused={String(paused)} aria-hidden="true" />
+  ),
+}));
 vi.mock("@/components/voice-switcher", () => ({
   useVoicePrefs: () => ({
     persona: { id: "daniyal", name: "Daniyal", badge: "D", ttsVoice: "voice", gender: "male" },
@@ -65,7 +68,7 @@ describe("HomeHero", () => {
       onOpen.mock.invocationCallOrder[0]!,
     );
     expect(input).toHaveValue("");
-    expect(screen.getByTestId("hero-building")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("preserves every suggestion query and live voice request", () => {
@@ -94,20 +97,24 @@ describe("HomeHero", () => {
     expect(onOpen).toHaveBeenCalledTimes(6);
   });
 
-  it("uses a static prompt without a caret under reduced motion", () => {
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn((query: string) => ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-      })),
-    );
+  it("pauses the portrait while the assistant is open", () => {
+    const view = render(<HomeHero onOpen={vi.fn()} assistantOpen={false} />);
+    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("data-paused", "false");
+
+    view.rerender(<HomeHero onOpen={vi.fn()} assistantOpen={true} />);
+    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("data-paused", "true");
+
+    view.rerender(<HomeHero onOpen={vi.fn()} assistantOpen={false} />);
+    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("data-paused", "false");
+  });
+
+  it("uses one stable prompt without a typewriter caret", () => {
     const { container } = render(<HomeHero onOpen={vi.fn()} />);
 
-    expect(mocks.typewriter).toHaveBeenCalledWith(expect.any(Array), false);
-    expect(
-      screen.getByText("Ask anything about Daniyal's AI and engineering experience…"),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Ask about Daniyal" })).toHaveAttribute(
+      "placeholder",
+      "Ask about experience, projects, architecture, or availability…",
+    );
     expect(container.querySelector(".caret")).toBeNull();
   });
 
