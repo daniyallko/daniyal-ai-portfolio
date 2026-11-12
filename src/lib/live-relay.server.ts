@@ -101,12 +101,18 @@ function workerSocket(socket: WorkerSocket): LiveSocket {
   };
 }
 
-export function handleLiveRequest(request: Request): Response {
+export async function handleLiveRequest(request: Request): Promise<Response> {
   const waitUntil = (request as Request & Partial<LiveExecutionContext>).waitUntil;
   if (!waitUntil) return new Response("Live runtime unavailable", { status: 503 });
-  const config = getLiveConfig(request.url);
   const rejected = validateLiveUpgrade(request);
   if (rejected) return rejected;
+  const { enforceRateLimit } = await import("../server/rate-limit.server");
+  const limited = await enforceRateLimit(request, [
+    { scope: "live:ip:ten-minutes", limit: 5, windowSeconds: 600 },
+    { scope: "live:ip:day", limit: 20, windowSeconds: 86_400 },
+  ]);
+  if (limited) return limited;
+  const config = getLiveConfig(request.url);
   const pair = new WebSocketPair();
   pair[1].accept();
   bindLiveConnection(workerSocket(pair[1]), config, { waitUntil });

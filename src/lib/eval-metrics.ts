@@ -6,6 +6,11 @@ export function recallAtK(retrieved: string[], expected: string[]): number {
   return expected.filter((e) => retrieved.includes(e)).length / expected.length;
 }
 
+/** Recall for answerable cases; rejection accuracy when no chunk should match. */
+export function retrievalOutcomeScore(retrieved: string[], expected: string[]): number {
+  return expected.length ? recallAtK(retrieved, expected) : retrieved.length === 0 ? 1 : 0;
+}
+
 /** Reciprocal rank of the first expected chunk (0 if none retrieved). */
 export function mrr(retrieved: string[], expected: string[]): number {
   const i = retrieved.findIndex((r) => expected.includes(r));

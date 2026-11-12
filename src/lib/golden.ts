@@ -5,6 +5,7 @@ export type GoldenCase = {
   question: string;
   expectedChunks: string[];
   mustMention: string[];
+  expectNoContext?: boolean;
 };
 
 export const golden: GoldenCase[] = [
@@ -67,5 +68,26 @@ export const golden: GoldenCase[] = [
     question: "What did he do at ProProfs?",
     expectedChunks: ["exp-proprofs-0"],
     mustMention: ["PHP", "A/B"],
+  },
+  {
+    id: "unknown-salary",
+    question: "What annual compensation does he expect?",
+    expectedChunks: [],
+    mustMention: [],
+    expectNoContext: true,
+  },
+  {
+    id: "unknown-pilot",
+    question: "Does he hold an aviation pilot licence?",
+    expectedChunks: [],
+    mustMention: [],
+    expectNoContext: true,
+  },
+  {
+    id: "off-topic-weather",
+    question: "Will it rain in Reykjavik tomorrow?",
+    expectedChunks: [],
+    mustMention: [],
+    expectNoContext: true,
   },
 ];

@@ -14,6 +14,12 @@ export const Route = createFileRoute("/api/transcribe")({
         if (file.size > MAX_BYTES)
           return Response.json({ error: "Recording is too long" }, { status: 413 });
         try {
+          const { enforceRateLimit } = await import("@/server/rate-limit.server");
+          const limited = await enforceRateLimit(request, [
+            { scope: "transcribe:ip:minute", limit: 10, windowSeconds: 60 },
+            { scope: "transcribe:ip:day", limit: 40, windowSeconds: 86_400 },
+          ]);
+          if (limited) return limited;
           const named = file;
           const res = await transcribeAudio({ model: "openai/gpt-transcribe", file: named });
           const out = res as unknown as { text?: string; language?: string };

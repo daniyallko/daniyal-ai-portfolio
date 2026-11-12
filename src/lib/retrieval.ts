@@ -59,6 +59,19 @@ function ranks(scores: number[]): number[] {
   return r;
 }
 
+/** Merge raw and context-expanded searches while preserving primary ranking. */
+export function mergeSources<T extends { id: string; n: number }>(
+  primary: T[],
+  secondary: T[],
+  topK = 5,
+): T[] {
+  const unique = new Map<string, T>();
+  for (const source of [...primary, ...secondary]) {
+    if (!unique.has(source.id)) unique.set(source.id, source);
+  }
+  return [...unique.values()].slice(0, topK).map((source, i) => ({ ...source, n: i + 1 }));
+}
+
 export type Scored = {
   chunk: Chunk;
   bm25: number;
