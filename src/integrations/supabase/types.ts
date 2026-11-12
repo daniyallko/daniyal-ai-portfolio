@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      api_rate_limits: {
-        Row: {
-          expires_at: string;
-          key: string;
-          request_count: number;
-          window_started_at: string;
-        };
-        Insert: {
-          expires_at: string;
-          key: string;
-          request_count: number;
-          window_started_at: string;
-        };
-        Update: {
-          expires_at?: string;
-          key?: string;
-          request_count?: number;
-          window_started_at?: string;
-        };
-        Relationships: [];
-      };
       chat_messages: {
         Row: {
           content: string
@@ -77,8 +56,6 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          memory_message_count: number
-          memory_summary: string
           title: string
           updated_at: string
           visitor_id: string
@@ -86,8 +63,6 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          memory_message_count?: number
-          memory_summary?: string
           title?: string
           updated_at?: string
           visitor_id: string
@@ -95,8 +70,6 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          memory_message_count?: number
-          memory_summary?: string
           title?: string
           updated_at?: string
           visitor_id?: string
@@ -297,10 +270,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      consume_rate_limit: {
-        Args: { _key: string; _limit: number; _window_seconds: number };
-        Returns: { allowed: boolean; remaining: number; retry_after: number }[];
-      };
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
