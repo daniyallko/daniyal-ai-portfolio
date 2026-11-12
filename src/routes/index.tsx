@@ -166,13 +166,13 @@ function Index() {
           <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:border-x lg:border-hairline">
             <section
               aria-label="Career statistics"
-              className="grid grid-cols-2 border-y border-hairline md:grid-cols-4"
+              className="grid grid-cols-2 border-y border-hairline md:grid-cols-5"
             >
               {stats.map((s, i) => (
                 <div
                   key={s.label}
                   style={{ "--i": i } as React.CSSProperties}
-                  className="reveal relative border-hairline px-1 py-8 odd:border-r md:border-r md:px-6 md:py-10 md:last:border-r-0"
+                  className="reveal relative border-hairline px-1 py-8 odd:border-r last:col-span-2 last:border-r-0 last:border-t md:col-span-1 md:border-r md:border-t-0 md:px-5 md:py-10 md:last:col-span-1 md:last:border-t-0"
                 >
                   <span aria-hidden className="font-mono text-[10px] tracking-[0.16em] text-signal">
                     0{i + 1}
@@ -338,7 +338,14 @@ function Index() {
                   >
                     {profile.email}
                   </a>
-                  <p className="mt-6 text-sm">
+                  <p className="mt-6 text-sm text-foreground">{profile.availability}.</p>
+                  <p className="mt-2 text-sm">
+                    <a href={`tel:${profile.phone.replace(/\s/g, "")}`} className="hover:text-signal">
+                      {profile.phone}
+                    </a>{" "}
+                    · {profile.location} · Speaks {profile.languages}
+                  </p>
+                  <p className="mt-2 text-sm">
                     {education.degree} · {education.period}
                   </p>
                 </div>
@@ -350,6 +357,10 @@ function Index() {
                 >
                   Website ↗
                 </a>
+                <div className="flex flex-wrap gap-2 md:col-start-2">
+                  <a href={profile.linkedin} target="_blank" rel="noreferrer" className="flex min-h-12 items-center rounded-full border border-hairline px-5 text-sm text-foreground transition-colors hover:border-primary hover:text-signal">LinkedIn ↗</a>
+                  <a href={profile.github} target="_blank" rel="noreferrer" className="flex min-h-12 items-center rounded-full border border-hairline px-5 text-sm text-foreground transition-colors hover:border-primary hover:text-signal">GitHub ↗</a>
+                </div>
               </div>
             </footer>
           </div>

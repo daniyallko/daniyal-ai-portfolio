@@ -8,7 +8,8 @@ describe("hybrid retrieval", () => {
   it("keyword search finds the Stripe migration for a Stripe question", () => {
     const s = bm25Scores("Stripe migration users", chunks);
     const best = chunks[s.indexOf(Math.max(...s))];
-    expect(best?.text).toContain("10,000+ users between Stripe accounts");
+    expect(best?.text).toMatch(/10,000\+ (users|Stripe subscriptions)/);
+    expect(best?.text).toContain("Stripe");
   });
   it("fusion ranks a chunk found by both signals above one found by one", () => {
     const c = chunks.slice(0, 3);

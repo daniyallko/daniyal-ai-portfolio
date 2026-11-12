@@ -6,12 +6,15 @@ export const profile = {
   title: "Full Stack AI Engineer",
   tagline: "Agentic AI · Advanced RAG · Voice AI",
   location: "Lucknow, India",
-  availability: "Open to relocation (UAE / international) and remote",
+  availability: "Immediate joiner (no notice period), open to remote roles and relocation, including international",
+  languages: "English, Hindi and Urdu; reads Arabic",
   email: "daniyallko@gmail.com",
   phone: "+91 7007644677",
   website: "https://daniyal.online",
+  linkedin: "https://www.linkedin.com/in/mohd-daniyal-ai/",
+  github: "https://github.com/daniyallko",
   summary:
-    "Full Stack AI Engineer with 5+ years of experience building production web platforms, specializing in agentic AI, advanced RAG, and voice AI. Built core parts of AI BotKit, a multi-channel RAG chatbot platform live on 1,000+ websites serving 100,000+ users (hybrid retrieval with reranking, LangGraph agents, voice, WhatsApp and Telegram, LLM tracing). Also built multi-agent and real-time voice AI systems, and runs a licensing platform at 99.9% uptime on Kubernetes.",
+    "Full Stack AI Engineer with 5+ years of experience building production web platforms, specializing in agentic AI, advanced RAG, and voice AI. Built core parts of AI BotKit, a multi-channel RAG chatbot platform live on 1,000+ websites serving 100,000+ users (hybrid retrieval with reranking, LangGraph agents, voice, WhatsApp and Telegram, LLM tracing). Also built multi-agent and real-time voice AI systems, and owns the Edwiser.org licensing platform at 99.9% uptime, including a zero-downtime migration of 10,000+ Stripe subscriptions.",
 };
 
 export const stats = [
@@ -19,6 +22,7 @@ export const stats = [
   { value: "1,000+", label: "websites running AI BotKit" },
   { value: "100k+", label: "end users served" },
   { value: "99.9%", label: "uptime on Edwiser.org" },
+  { value: "10k+", label: "Stripe subscriptions migrated, zero downtime" },
 ];
 
 export type Experience = {
@@ -37,15 +41,15 @@ export const experience: Experience[] = [
     company: "WisdmLabs",
     period: "July 2023 – Present",
     context:
-      "AI BotKit (multi-tenant AI chatbot platform, team project) and Edwiser.org (production licensing platform)",
+      "AI BotKit (multi-tenant AI chatbot platform, core engineer on a team of about four) and Edwiser.org (production licensing platform)",
     bullets: [
       "AI BotKit: built core components of a multi-tenant RAG chatbot platform, now live on 1,000+ websites and serving 100,000+ users. It scans a customer's website and documents, builds a knowledge base, and embeds a chat widget through a single JavaScript snippet.",
       "Developed the advanced RAG pipeline: Pinecone hybrid search (dense + sparse), cross-encoder reranking, and relevance gating with query reformulation.",
       "Built the agentic chat engine with LangChain and LangGraph, with tool calling, persistent multi-turn memory in PostgreSQL, and multi-provider LLM support (OpenAI, Gemini).",
       "Built Python (FastAPI) services for the platform backend, and used LangSmith for LLM tracing, token tracking, and response evaluation.",
-      "Implemented WhatsApp, Telegram, and other channel integrations, and voice support with Whisper transcription and replies in the user's language.",
+      "Built the native Meta WhatsApp Cloud API and Telegram channels as adapters around one shared RAG engine, and upgraded Telegram from text-only to full voice: Whisper transcription with language detection, replies in the user's language, and photo + voice-note pairing into one multimodal request.",
       "Edwiser.org: owns this live licensing platform (license sales, activation and deactivation), responsible for 99.9% uptime, speed, server management, and custom development; infrastructure runs on Kubernetes.",
-      "Migrated 10,000+ users between Stripe accounts with no downtime, and built a one-click Stripe subscription upgrade flow that charges the saved card and upgrades the license in one step.",
+      "Migrated 10,000+ users and subscriptions between Stripe accounts with no downtime (scripted JSON export, full rehearsal on staging and test accounts, database synced to the new subscription IDs), and built a one-click upgrade plugin that charges the saved card and upgrades the license in one step.",
       "Moved the site to faster infrastructure; resolves support tickets and works directly with international clients.",
     ],
   },
@@ -84,9 +88,9 @@ export const projects: Project[] = [
     id: "ai-botkit",
     name: "AI BotKit",
     kind: "Production · WisdmLabs",
-    blurb: "Multi-tenant RAG chatbot platform live on 1,000+ websites, serving 100,000+ users.",
+    blurb: "Multi-tenant RAG chatbot platform live on 1,000+ websites, serving 100,000+ users across web, WhatsApp, Telegram and more.",
     details:
-      "Scans a customer's website and documents, builds a knowledge base, and embeds a chat widget with one JavaScript snippet. Pinecone hybrid search (dense + sparse), cross-encoder reranking, relevance gating with query reformulation, LangGraph agentic engine with tool calling, PostgreSQL memory, OpenAI and Gemini, LangSmith tracing, WhatsApp/Telegram channels and Whisper voice.",
+      "Scans a customer's website and documents, builds a knowledge base, and embeds a chat widget with one JavaScript snippet. Pinecone hybrid search (dense + sparse), cross-encoder reranking, relevance gating with query reformulation, LangGraph agentic engine with tool calling, PostgreSQL checkpointed memory with summarization, a strict grounding policy with an honest fallback and human handover, OpenAI and Gemini, LangSmith tracing, WhatsApp/Telegram channels and multilingual Whisper voice.",
     tags: ["LangGraph", "Pinecone", "FastAPI", "Reranking", "Whisper"],
     featured: true,
   },
@@ -94,9 +98,9 @@ export const projects: Project[] = [
     id: "edwiser",
     name: "Edwiser.org",
     kind: "Production · WisdmLabs",
-    blurb: "Licensing platform at 99.9% uptime on Kubernetes.",
+    blurb: "Revenue-critical licensing platform kept at 99.9% uptime.",
     details:
-      "Owns license sales, activation and deactivation. Migrated 10,000+ users between Stripe accounts with zero downtime and built a one-click subscription upgrade flow that charges the saved card and upgrades the license in one step.",
+      "Owns uptime, speed, servers, license sales and activation end to end. Migrated 10,000+ users and subscriptions between Stripe accounts with zero downtime, and built a one-click upgrade plugin that charges the saved card and upgrades the license with no checkout.",
     tags: ["Kubernetes", "Stripe", "PHP", "Infra"],
   },
   {

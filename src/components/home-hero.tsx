@@ -12,27 +12,28 @@ export type AssistantRequest = { q?: string; call?: boolean };
 const PROMPTS = [
   "Ask anything about Daniyal's AI and engineering experience…",
   "Tap Live Voice to talk to Daniyal's AI in real time…",
-  "Speak in English, Hindi, Hinglish or Spanish — auto-detected…",
-  "Ask: “Show me Daniyal's best RAG and Kubernetes work”…",
+  "Speak English, Hindi or Hinglish. Language is auto-detected…",
+  "Ask: “How does AI BotKit avoid hallucinations?”…",
+  "Ask: “Is Daniyal available immediately?”…",
 ] as const;
 
 const CREDS = [
   "Advanced RAG",
   "LangGraph agents",
   "Real-time voice AI",
-  "Kubernetes",
-  "FastAPI",
+  "WhatsApp & Telegram bots",
+  "Stripe migrations",
   "Pinecone hybrid search",
 ];
 
 const CHIPS: { label: string; q?: string; call?: boolean }[] = [
   {
     label: "System architecture",
-    q: "Walk me through the architecture of AI BotKit's RAG pipeline.",
+    q: "How does AI BotKit's RAG pipeline work?",
   },
-  { label: "Featured projects", q: "What are Daniyal's most impressive projects?" },
+  { label: "Best projects", q: "What are Daniyal's best projects?" },
   { label: "Start voice intro", call: true },
-  { label: "Résumé & availability", q: "Summarize his experience and availability for new roles." },
+  { label: "Availability", q: "Is Daniyal available immediately? What is his notice period?" },
 ];
 
 export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => void }) {
@@ -160,7 +161,7 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
               <span className="absolute inset-0 animate-ping rounded-full bg-signal opacity-60 motion-reduce:hidden" />
               <span className="relative h-2 w-2 rounded-full bg-signal" />
             </span>
-            Available · {profile.location} · open to relocation
+            Immediate joiner · {profile.location} · remote or relocation
           </p>
           <h1
             className="hero-enter mt-7 max-w-[12ch] text-[clamp(3.25rem,7.4vw,7.5rem)] font-semibold leading-[0.86] tracking-[-0.065em] text-balance"
@@ -175,8 +176,9 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
             className="hero-enter mt-7 max-w-[62ch] text-[clamp(1rem,1.35vw,1.2rem)] leading-relaxed text-muted-foreground"
             style={{ "--enter": 2 } as React.CSSProperties}
           >
-            {profile.title} with 5+ years in production. Core engineer on AI BotKit — a RAG chatbot
-            platform live on 1,000+ websites serving 100,000+ users.
+            {profile.title} with 5+ years in production. Core engineer on AI BotKit, a RAG chatbot
+            platform live on 1,000+ websites serving 100,000+ users, from hybrid retrieval to
+            WhatsApp, Telegram and multilingual voice.
           </p>
           <ul
             className="hero-enter mt-6 flex max-w-3xl flex-wrap gap-1.5"
@@ -240,7 +242,7 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2 border-t border-hairline px-1 pt-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-hairline px-1 pt-2">
               <div className="min-w-0 [&>div]:!ml-0">
                 <VoiceSwitcher
                   persona={prefs.persona}
@@ -260,7 +262,7 @@ export function HomeHero({ onOpen }: { onOpen: (request?: AssistantRequest) => v
                   }
                 />
               </div>
-              <div className="ml-auto flex items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
                 <button
                   type="button"
                   onClick={toggleDictation}
