@@ -50,6 +50,20 @@
       "when": 1794489003136,
       "tag": "0006_chat_reliability",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794495623947,
+      "tag": "0007_document_api_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794495656359,
+      "tag": "0008_restrict_api_rate_limits",
+      "breakpoints": true
     }
   ]
 }

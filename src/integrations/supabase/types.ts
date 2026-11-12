@@ -16,25 +16,25 @@ export type Database = {
     Tables: {
       api_rate_limits: {
         Row: {
-          expires_at: string;
-          key: string;
-          request_count: number;
-          window_started_at: string;
-        };
+          expires_at: string
+          key: string
+          request_count: number
+          window_started_at: string
+        }
         Insert: {
-          expires_at: string;
-          key: string;
-          request_count: number;
-          window_started_at: string;
-        };
+          expires_at: string
+          key: string
+          request_count: number
+          window_started_at: string
+        }
         Update: {
-          expires_at?: string;
-          key?: string;
-          request_count?: number;
-          window_started_at?: string;
-        };
-        Relationships: [];
-      };
+          expires_at?: string
+          key?: string
+          request_count?: number
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string
@@ -298,9 +298,13 @@ export type Database = {
     }
     Functions: {
       consume_rate_limit: {
-        Args: { _key: string; _limit: number; _window_seconds: number };
-        Returns: { allowed: boolean; remaining: number; retry_after: number }[];
-      };
+        Args: { _key: string; _limit: number; _window_seconds: number }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          retry_after: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
