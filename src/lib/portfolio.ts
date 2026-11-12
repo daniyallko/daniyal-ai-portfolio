@@ -11,6 +11,8 @@ export const profile = {
   email: "daniyallko@gmail.com",
   phone: "+91 7007644677",
   website: "https://daniyal.online",
+  linkedin: "https://www.linkedin.com/in/mohd-daniyal-ai/",
+  github: "https://github.com/daniyallko",
   summary:
     "Full Stack AI Engineer with 5+ years of experience building production web platforms, specializing in agentic AI, advanced RAG, and voice AI. Built core parts of AI BotKit, a multi-channel RAG chatbot platform live on 1,000+ websites serving 100,000+ users (hybrid retrieval with reranking, LangGraph agents, voice, WhatsApp and Telegram, LLM tracing). Also built multi-agent and real-time voice AI systems, and owns the Edwiser.org licensing platform at 99.9% uptime, including a zero-downtime migration of 10,000+ Stripe subscriptions.",
 };
