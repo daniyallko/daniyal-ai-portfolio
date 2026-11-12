@@ -1,3 +1,4 @@
+import { WARM_TIER1, WARM_TIER2, WARM_TIER3 } from "./warm-questions";
 import { buildChunks } from "@/lib/portfolio";
 import { bridgeQuery, detectLanguage, isLangCode } from "@/lib/language";
 import { normalizeCrossLingualRagQuery } from "@/lib/multilingualVoiceEngine";
@@ -88,10 +89,22 @@ export function answerKey(raw: string, promptVersion: string, lock?: string): st
   const lang = isLangCode(lock) ? lock : d.code;
   return `${corpusVersion()}:a:${promptVersion}:${lang}:${d.script}:${d.isCodeSwitched}:${fingerprint(queryWords(raw).join(" "))}`;
 }
+/** Compensation and reasons for leaving are always answered live, never shared. */
+export const SENSITIVE =
+  /\b(salary|salaries|ctc|compensation|package|pay|expected|leav(e|ing)|quit(ting)?|resign\w*|why\b.*\b(new role|new job|switch|change|looking))\b/i;
 /** Only public-vocabulary standalone questions can publish model output globally. */
+let curated: Set<string> | undefined;
+/** Owner-vetted recruiter questions (and exact rephrasings with the same words) are always public. */
+function isCurated(raw: string): boolean {
+  curated ??= new Set(
+    [...WARM_TIER1, ...WARM_TIER2, ...WARM_TIER3].map((q) => queryWords(q).sort().join(" ")),
+  );
+  return curated.has(queryWords(raw).sort().join(" "));
+}
 export function canShareAnswer(raw: string, historyLength: number): boolean {
+  if (historyLength !== 0 || SENSITIVE.test(raw)) return false;
+  if (isCurated(raw)) return true;
   if (
-    historyLength !== 0 ||
     raw.length > 240 ||
     /[@\d]|https?:|\b(my|i|we|our|previous|above|that|instead|ignore|not|never|salary|offer|candidate)\b/i.test(
       raw,

@@ -702,22 +702,6 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
             delimiter={speech.delimiter}
             swaps={speech.swaps}
           />
-          {dispatches.length > 0 && (
-            <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.08em]">
-              <span className="text-muted-foreground">Open in portfolio:</span>
-              {dispatches.slice(-3).map((d) => (
-                <a
-                  key={d.at + d.href}
-                  href={d.href}
-                  target={inCall ? "_blank" : undefined}
-                  rel="noreferrer"
-                  className="inline-flex min-h-11 items-center border border-hairline bg-card px-3 text-signal transition-colors hover:border-signal"
-                >
-                  {actionLabel(d.action)} ↗
-                </a>
-              ))}
-            </div>
-          )}
           {!inCall && voice.endReason && (
             <div
               role="status"
