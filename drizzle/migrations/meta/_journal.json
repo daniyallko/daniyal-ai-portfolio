@@ -43,6 +43,13 @@
       "when": 1794320825788,
       "tag": "0005_resume_admin_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794489003136,
+      "tag": "0006_chat_reliability",
+      "breakpoints": true
     }
   ]
 }

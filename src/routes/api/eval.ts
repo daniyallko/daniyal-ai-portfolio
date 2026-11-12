@@ -2,7 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { streamResponse, GatewayError } from "@lovable.dev/ai-gateway";
 import { golden } from "@/lib/golden";
 import { CHAT_MODEL, CHAT_SYSTEM } from "@/lib/prompt";
-import { recallAtK, mrr, factCoverage, citationStats, qualityScore } from "@/lib/eval-metrics";
+import {
+  mrr,
+  factCoverage,
+  citationStats,
+  qualityScore,
+  retrievalOutcomeScore,
+} from "@/lib/eval-metrics";
 
 export type EvalResult = {
   id: string;
@@ -62,7 +68,10 @@ export const Route = createFileRoute("/api/eval")({
                     model: CHAT_MODEL,
                     instructions: CHAT_SYSTEM,
                     input: [
-                      { role: "user", content: `SOURCES:\n${ctx}\n\nQUESTION: ${c.question}` },
+                      {
+                        role: "user",
+                        content: `RETRIEVAL STATUS: ${nSources ? "ok" : "no_reliable_context"}\nSOURCES:\n${ctx}\n\nQUESTION: ${c.question}`,
+                      },
                     ],
                     reasoning: { effort: "low" },
                   },
@@ -87,7 +96,7 @@ export const Route = createFileRoute("/api/eval")({
                 ...(error ? { error } : {}),
                 retrieved,
                 expected: c.expectedChunks,
-                recall: recallAtK(retrieved, c.expectedChunks),
+                recall: retrievalOutcomeScore(retrieved, c.expectedChunks),
                 mrr: mrr(retrieved, c.expectedChunks),
                 facts,
                 missing: c.mustMention.filter(

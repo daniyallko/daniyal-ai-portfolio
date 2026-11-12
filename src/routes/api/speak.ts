@@ -52,6 +52,12 @@ export const Route = createFileRoute("/api/speak")({
         }
 
         try {
+          const { enforceRateLimit } = await import("@/server/rate-limit.server");
+          const limited = await enforceRateLimit(request, [
+            { scope: "speak:ip:minute", limit: 30, windowSeconds: 60 },
+            { scope: "speak:ip:day", limit: 200, windowSeconds: 86_400 },
+          ]);
+          if (limited) return limited;
           const res = await generateSpeech(
             {
               model: SPEAK_MODEL,

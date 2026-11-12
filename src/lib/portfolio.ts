@@ -198,11 +198,13 @@ export function setExtraChunks(chunks: Chunk[]) {
   extraChunks = chunks;
 }
 
-/** Split an admin document into ~900-char paragraph-aligned chunks. */
+/** Split an admin document into paragraph-aligned chunks with bounded overlap. */
 export function chunkDocument(
   doc: { id: string; title: string; section: string; content: string },
   max = 900,
 ): Chunk[] {
+  const overlap = Math.min(120, Math.floor(max / 5));
+  const bodyMax = Math.max(1, max - overlap - (overlap ? 1 : 0));
   const paras = doc.content
     .replace(/\r/g, "")
     .split(/\n\s*\n+/)
@@ -211,21 +213,27 @@ export function chunkDocument(
   const out: string[] = [];
   let cur = "";
   for (const p of paras.flatMap((p) =>
-    p.length > max ? (p.match(new RegExp(`.{1,${max}}(\\s|$)`, "g")) ?? [p]) : [p],
+    p.length > bodyMax ? (p.match(new RegExp(`.{1,${bodyMax}}(\\s|$)`, "g")) ?? [p]) : [p],
   )) {
-    if (cur && cur.length + p.length + 1 > max) {
+    if (cur && cur.length + p.length + 1 > bodyMax) {
       out.push(cur);
       cur = "";
     }
     cur = cur ? `${cur} ${p.trim()}` : p.trim();
   }
   if (cur) out.push(cur);
-  return out.map((text, i) => ({
-    id: `doc-${doc.id.slice(0, 8)}-${i}`,
-    section: doc.section,
-    title: out.length > 1 ? `${doc.title} (${i + 1}/${out.length})` : doc.title,
-    text,
-  }));
+  return out.map((body, i) => {
+    const previous = i > 0 ? out[i - 1]! : "";
+    const tail = previous.slice(-overlap).trim();
+    const prefix = tail.includes(" ") ? tail.slice(tail.indexOf(" ") + 1) : tail;
+    const text = prefix ? `${prefix} ${body}` : body;
+    return {
+      id: `doc-${doc.id.slice(0, 8)}-${i}`,
+      section: doc.section,
+      title: out.length > 1 ? `${doc.title} (${i + 1}/${out.length})` : doc.title,
+      text,
+    };
+  });
 }
 
 export function buildChunks(): Chunk[] {

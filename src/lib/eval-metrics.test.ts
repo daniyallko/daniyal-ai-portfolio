@@ -1,9 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { recallAtK, mrr, factCoverage, citationStats, qualityScore } from "./eval-metrics";
+import {
+  recallAtK,
+  mrr,
+  factCoverage,
+  citationStats,
+  qualityScore,
+  retrievalOutcomeScore,
+} from "./eval-metrics";
 
 describe("eval metrics", () => {
   it("recall counts expected chunks that were retrieved", () => {
     expect(recallAtK(["a", "b", "c"], ["b", "z"])).toBe(0.5);
+  });
+  it("scores no-context cases only when every weak candidate is rejected", () => {
+    expect(retrievalOutcomeScore([], [])).toBe(1);
+    expect(retrievalOutcomeScore(["unrelated"], [])).toBe(0);
+    expect(retrievalOutcomeScore(["a", "b"], ["b", "z"])).toBe(0.5);
   });
   it("mrr uses the rank of the first relevant chunk", () => {
     expect(mrr(["x", "y", "a"], ["a"])).toBeCloseTo(1 / 3);
