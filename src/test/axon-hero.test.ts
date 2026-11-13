@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createElement } from "react";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AxonHero } from "@/components/axon-hero";
 
@@ -62,6 +62,7 @@ function installBrowserMocks() {
     }),
   });
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  Object.defineProperty(document, "readyState", { configurable: true, value: "complete" });
   connection = Object.assign(new EventTarget(), { saveData: false });
   Object.defineProperty(navigator, "connection", {
     configurable: true,
@@ -90,6 +91,32 @@ function changeMedia(query: string) {
   }
 }
 
+function engage(pointerType = "mouse", eventType: "move" | "down" = "move") {
+  const root = screen.getByTestId("axon-hero");
+  vi.spyOn(root, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    right: 1440,
+    bottom: 900,
+    width: 1440,
+    height: 900,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  if (eventType === "down") {
+    fireEvent.pointerDown(window, { clientX: 720, clientY: 450, pointerType });
+  } else {
+    fireEvent.pointerMove(window, { clientX: 720, clientY: 450, pointerType });
+  }
+}
+
+function renderEngaged(props: { paused?: boolean } = {}) {
+  const view = render(createElement(AxonHero, props));
+  engage();
+  return view;
+}
+
 beforeEach(() => {
   installBrowserMocks();
 });
@@ -106,13 +133,48 @@ afterEach(() => {
 });
 
 describe("AxonHero lifecycle", () => {
+  it("does not mount during hydration or idle prefetch", async () => {
+    let idle: IdleRequestCallback | undefined;
+    const requestIdle = vi.fn((callback: IdleRequestCallback) => {
+      idle = callback;
+      return 1;
+    });
+    vi.stubGlobal("requestIdleCallback", requestIdle);
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
+    render(createElement(AxonHero));
+    await act(async () => Promise.resolve());
+    expect(mountMock).not.toHaveBeenCalled();
+    expect(requestIdle).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      idle?.({ didTimeout: false, timeRemaining: () => 50 });
+      await Promise.resolve();
+    });
+    expect(mountMock).not.toHaveBeenCalled();
+  });
+
+  it("mounts immediately on touch intent inside the hero", async () => {
+    coarsePointer = true;
+    render(createElement(AxonHero));
+    expect(mountMock).not.toHaveBeenCalled();
+    engage("touch", "down");
+    await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
+    expect(mountMock.mock.calls[0]![1].count).toBe(16384);
+    expect(mountMock.mock.calls[0]![1]).toEqual(
+      expect.objectContaining({
+        simulationSize: 128,
+        dyeSize: 256,
+        pressureIterations: 3,
+        pixelRatio: 1,
+        frameRate: 30,
+      }),
+    );
+  });
+
   it("keeps a static portrait and never enhances for reduced motion", () => {
     reducedMotion = true;
-    render(createElement(AxonHero));
-    expect(screen.getByTestId("axon-hero")).toHaveAttribute(
-      "data-enhanced",
-      "false",
-    );
+    renderEngaged();
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-enhanced", "false");
     const fallbacks = screen.getAllByRole("presentation", { hidden: true });
     expect(fallbacks).toHaveLength(1);
     expect(fallbacks[0]).toHaveClass("axon-hero__fallback");
@@ -120,13 +182,13 @@ describe("AxonHero lifecycle", () => {
   });
 
   it("mounts one eligible desktop renderer and disposes it on unmount", async () => {
-    const { unmount } = render(createElement(AxonHero));
+    const { unmount } = renderEngaged();
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
     expect(mountMock.mock.calls[0]![1].count).toBe(262144);
-    expect(screen.getByTestId("axon-hero")).toHaveAttribute(
-      "data-enhanced",
-      "true",
+    expect(mountMock.mock.calls[0]![1]).toEqual(
+      expect.objectContaining({ pressureIterations: 5, pixelRatio: 1.25, frameRate: 60 }),
     );
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-enhanced", "true");
     unmount();
     expect(disposeMock).toHaveBeenCalledTimes(1);
     expect(disconnectMock).toHaveBeenCalled();
@@ -134,27 +196,33 @@ describe("AxonHero lifecycle", () => {
 
   it("uses the mobile budget for coarse pointers", async () => {
     coarsePointer = true;
-    render(createElement(AxonHero));
+    renderEngaged();
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
     expect(mountMock.mock.calls[0]![1].count).toBe(16384);
+    expect(mountMock.mock.calls[0]![1]).toEqual(
+      expect.objectContaining({
+        simulationSize: 128,
+        dyeSize: 256,
+        pressureIterations: 3,
+        pixelRatio: 1,
+        frameRate: 30,
+      }),
+    );
   });
 
   it("disposes a live renderer when reduced data changes", async () => {
-    render(createElement(AxonHero));
+    renderEngaged();
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
     act(() => {
       reducedData = true;
       changeMedia("(prefers-reduced-data: reduce)");
     });
     expect(disposeMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("axon-hero")).toHaveAttribute(
-      "data-enhanced",
-      "false",
-    );
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-enhanced", "false");
   });
 
   it("disposes and restores the renderer on live save-data changes", async () => {
-    render(createElement(AxonHero));
+    renderEngaged();
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
 
     act(() => {
@@ -176,7 +244,7 @@ describe("AxonHero lifecycle", () => {
 
   it("keeps the static fallback until the engine reports its first ready frame", async () => {
     autoReady = false;
-    render(createElement(AxonHero));
+    renderEngaged();
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
     const root = screen.getByTestId("axon-hero");
     expect(root).toHaveAttribute("data-enhanced", "false");
@@ -188,7 +256,7 @@ describe("AxonHero lifecycle", () => {
   });
 
   it("pauses and resumes for the external assistant state", async () => {
-    const view = render(createElement(AxonHero, { paused: false }));
+    const view = renderEngaged({ paused: false });
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
     const root = screen.getByTestId("axon-hero");
 
@@ -200,7 +268,7 @@ describe("AxonHero lifecycle", () => {
   });
 
   it("exposes offscreen and hidden-document pause state", async () => {
-    render(createElement(AxonHero));
+    renderEngaged();
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
     const root = screen.getByTestId("axon-hero");
     act(() => {
@@ -225,14 +293,11 @@ describe("AxonHero lifecycle", () => {
   });
 
   it("restores the static portrait and removes WebGL after context loss", async () => {
-    render(createElement(AxonHero));
+    renderEngaged();
     await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
     act(() => mountMock.mock.calls[0]![1].onContextLoss());
     expect(disposeMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("axon-hero")).toHaveAttribute(
-      "data-enhanced",
-      "false",
-    );
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-enhanced", "false");
     expect(document.querySelector("canvas")).not.toBeInTheDocument();
   });
 });
@@ -241,19 +306,14 @@ describe("client-only renderer contracts", () => {
   it("loads Three.js only behind ClientOnly and a dynamic engine import", () => {
     const source = readFileSync(resolve("src/components/axon-hero.tsx"), "utf8");
     expect(source).toContain("ClientOnly");
-    expect(source).toMatch(
-      /import\(\s*"@\/components\/axon-field-engine"\s*\)/,
-    );
+    expect(source).toMatch(/import\(\s*"@\/components\/axon-field-engine"\s*\)/);
     expect(source).not.toMatch(/from ["']three["']/);
     expect(source).toContain("addEventListener");
     expect(source).toContain("visibilitychange");
   });
 
   it("gates rendering on wrapper pause state and announces readiness after a frame", () => {
-    const source = readFileSync(
-      resolve("src/components/axon-field-engine.ts"),
-      "utf8",
-    );
+    const source = readFileSync(resolve("src/components/axon-field-engine.ts"), "utf8");
     expect(source).toContain('attributeFilter: ["data-paused"]');
     expect(source).toContain("renderer.render(scene, camera);");
     expect(source).toMatch(/renderer\.render\(scene, camera\);[\s\S]*onReady\(\)/);
@@ -262,8 +322,17 @@ describe("client-only renderer contracts", () => {
   it("places one static ring mask behind all hero content with the exact light ink", () => {
     const css = readFileSync(resolve("src/styles.css"), "utf8");
     const hero = readFileSync(resolve("src/components/home-hero.tsx"), "utf8");
-    expect(css).toMatch(/\.axon-hero\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*z-index:\s*0;/s);
-    expect(css).toMatch(/\.axon-hero__fallback\s*\{[^}]*mask-image:\s*url\("\/images\/axon-ring\.svg"\);[^}]*background:\s*currentColor;/s);
+    expect(css).toMatch(
+      /\.axon-hero\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*z-index:\s*0;/s,
+    );
+    expect(css).toMatch(
+      /\.axon-hero__fallback\s*\{[^}]*mask-image:\s*url\("\/images\/axon-ring\.svg"\);[^}]*background:\s*currentColor;/s,
+    );
+    expect(css).toContain("-webkit-mask-size: auto 100%;");
+    expect(css).toContain("mask-size: auto 100%;");
+    expect(css).toMatch(
+      /@media \(max-aspect-ratio: 3\/5\)\s*\{[^}]*\.axon-hero__fallback[^}]*axon-ring-narrow\.svg/s,
+    );
     for (const property of ["image", "position", "repeat", "size"]) {
       expect(css).toContain(`-webkit-mask-${property}:`);
     }
@@ -275,13 +344,27 @@ describe("client-only renderer contracts", () => {
     expect(hero).not.toContain("generic-face");
   });
 
-  it("caps DPR and disposes every owned Three.js resource", () => {
-    const source = readFileSync(
-      resolve("src/components/axon-field-engine.ts"),
-      "utf8",
+  it("preloads the matching fallback mask with the initial document", () => {
+    const source = readFileSync(resolve("src/routes/__root.tsx"), "utf8");
+    expect(source).toContain('href: "/images/axon-ring.svg"');
+    expect(source).toContain('href: "/images/axon-ring-narrow.svg"');
+    expect(source).toContain('rel: "preload"');
+    expect(source).toContain('as: "image"');
+    expect(source).toMatch(
+      /href: "\/images\/axon-ring\.svg",\s*as: "image",\s*crossOrigin: "anonymous"/,
     );
+    expect(source).toMatch(
+      /href: "\/images\/axon-ring-narrow\.svg",\s*as: "image",\s*crossOrigin: "anonymous"/,
+    );
+    expect(source).toContain('media: "(min-aspect-ratio: 3/5)"');
+    expect(source).toContain('media: "(max-aspect-ratio: 3/5)"');
+  });
+
+  it("caps DPR and disposes every owned Three.js resource", () => {
+    const source = readFileSync(resolve("src/components/axon-field-engine.ts"), "utf8");
     expect(source).toContain("Math.min(window.devicePixelRatio");
-    expect(source).toContain("Math.min(window.devicePixelRatio || 1, 1.5)");
+    expect(source).toContain("Math.min(window.devicePixelRatio || 1, pixelRatio)");
+    expect(source).toContain("const frameInterval = 1000 / frameRate");
     expect(source).toContain("new THREE.BufferGeometry");
     expect(source).toContain("new THREE.Points");
     expect(source).toContain("geometry.dispose()");

@@ -152,6 +152,7 @@ export const positionShader = /* glsl */ `
   uniform mat4 uViewProjection;
   uniform float uTime;
   uniform float uDelta;
+  uniform float uRecovery;
 
   float ringSdf(vec3 point) {
     vec3 p = point / 0.6;
@@ -171,12 +172,12 @@ export const positionShader = /* glsl */ `
 
   vec3 sdfNormal(vec3 point) {
     const float epsilon = 0.0015;
-    vec2 e = vec2(epsilon, 0.0);
-    return normalize(vec3(
-      ringSdf(point + e.xyy) - ringSdf(point - e.xyy),
-      ringSdf(point + e.yxy) - ringSdf(point - e.yxy),
-      ringSdf(point + e.yyx) - ringSdf(point - e.yyx)
-    ));
+    vec2 e = vec2(epsilon, -epsilon);
+    vec3 gradient = e.xyy * ringSdf(point + e.xyy) +
+      e.yyx * ringSdf(point + e.yyx) +
+      e.yxy * ringSdf(point + e.yxy) +
+      e.xxx * ringSdf(point + e.xxx);
+    return normalize(gradient);
   }
 
   vec3 curlNoise(vec3 p) {
@@ -200,14 +201,12 @@ export const positionShader = /* glsl */ `
     vec3 pos = data.xyz;
     vec3 origin = texture2D(uOrigins, uv).xyz;
     float hz = min(uDelta * 60.0, 2.0);
-    if (length(pos) > 0.7) pos /= 2.0;
 
     float sdf = ringSdf(pos);
     vec3 gradient = sdfNormal(pos);
     pos += curlNoise(pos * 0.1 + vec3(uTime * 0.05)) * 0.0002 * hz;
-    pos += cross(normalize(pos), normalize(gradient)) * 0.0005;
-    pos += -gradient * sdf * 0.5;
-    pos += (origin - pos) * 0.0002 * hz;
+    pos += cross(normalize(pos), normalize(gradient)) * 0.0005 * hz;
+    pos += -gradient * sdf * min(uDelta * 30.0, 1.0);
 
     vec4 clip = uViewProjection * vec4(pos, 1.0);
     vec2 fluidUv = clip.xy / max(clip.w, 0.0001) * 0.5 + 0.5;
@@ -216,6 +215,7 @@ export const positionShader = /* glsl */ `
     float fluidDensity = texture2D(uFluidDensity, clamp(fluidUv, 0.0, 1.0)).x;
     vec3 flow = vec3(fluidVelocity, 0.0);
     pos += flow * 0.0001 * hz * 0.4 * fluidDensity * inside;
+    pos = mix(pos, origin, uRecovery);
 
     gl_FragColor = vec4(pos, data.w);
   }

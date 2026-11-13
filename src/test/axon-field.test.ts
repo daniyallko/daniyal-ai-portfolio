@@ -9,6 +9,9 @@ import {
   axonBudget,
   axonFrameScale,
   axonOrigin,
+  axonProject,
+  axonQuality,
+  axonRecoveryAlpha,
   axonRingSdf,
   axonSplatRadius,
 } from "@/lib/axon-field";
@@ -87,6 +90,16 @@ describe("AXON budgets and reference configuration", () => {
     expect(maximumDistance).toBeLessThan(0.000001);
   });
 
+  it("projects static points through the live camera and group transform", () => {
+    const point = axonOrigin(0.4, 1.2);
+    expect(axonProject(point, 1440, 900)[0]).toBeCloseTo(946.767593, 5);
+    expect(axonProject(point, 1440, 900)[1]).toBeCloseTo(315.582218, 5);
+    expect(axonProject(point, 1024, 768)[0]).toBeCloseTo(705.508346, 5);
+    expect(axonProject(point, 1024, 768)[1]).toBeCloseTo(269.296826, 5);
+    expect(axonProject(point, 390, 844)[0]).toBeCloseTo(358.776595, 5);
+    expect(axonProject(point, 390, 844)[1]).toBeCloseTo(324.92049, 5);
+  });
+
   it("zooms out only when the hero is narrower than the reference frame", () => {
     expect(axonFrameScale(1440, 900)).toBe(1);
     expect(axonFrameScale(1024, 768)).toBe(1);
@@ -94,23 +107,83 @@ describe("AXON budgets and reference configuration", () => {
     expect(axonFrameScale(0, 0)).toBe(1);
   });
 
+  it.each([
+    [390, 772],
+    [360, 668],
+  ])("overlays the narrow fallback on the live projection at %ix%i", (width, height) => {
+    const css = readFileSync(resolve("src/styles.css"), "utf8");
+    const narrowRule = css.match(/@media \(max-aspect-ratio: 3\/5\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const widthScaled = /(?:-webkit-)?mask-size:\s*100% auto/.test(narrowRule);
+    const scale = widthScaled ? width / 390 : height / 844;
+    const maskWidth = widthScaled ? width : 390 * scale;
+    const maskHeight = widthScaled ? 844 * scale : height;
+    const baked = axonProject(axonOrigin(0.4, 1.2), 390, 844);
+    const displayed = [
+      (width - maskWidth) / 2 + baked[0] * scale,
+      (height - maskHeight) / 2 + baked[1] * scale,
+    ];
+    const live = axonProject(axonOrigin(0.4, 1.2), width, height);
+    expect(displayed[0]).toBeCloseTo(live[0], 8);
+    expect(displayed[1]).toBeCloseTo(live[1], 8);
+  });
+
   it("uses the approved 0.8 mobile splat-radius multiplier", () => {
     expect(axonSplatRadius(262144)).toBe(0.002);
     expect(axonSplatRadius(16384)).toBe(0.0016);
   });
+
+  it("reduces mobile fluid, pressure, DPR, and frame budgets without reducing density", () => {
+    expect(axonQuality(16384)).toEqual({
+      simulationSize: 128,
+      dyeSize: 256,
+      pressureIterations: 3,
+      pixelRatio: 1,
+      frameRate: 30,
+    });
+    expect(axonQuality(262144)).toEqual({
+      simulationSize: 256,
+      dyeSize: 512,
+      pressureIterations: 5,
+      pixelRatio: 1.25,
+      frameRate: 60,
+    });
+  });
+});
+
+describe("AXON origin recovery", () => {
+  it.each([30, 60, 120])("recovers at least 99 percent in one second at %i FPS", (fps) => {
+    let residual = 1;
+    for (let frame = 0; frame < fps; frame += 1) {
+      residual *= 1 - axonRecoveryAlpha(1 / fps, false);
+    }
+    expect(residual).toBeLessThan(0.01);
+  });
+
+  it("keeps recovery weaker during active interaction and ignores invalid elapsed time", () => {
+    expect(axonRecoveryAlpha(1 / 60, true)).toBeLessThan(axonRecoveryAlpha(1 / 60, false));
+    expect(axonRecoveryAlpha(0, false)).toBe(0);
+    expect(axonRecoveryAlpha(-1, false)).toBe(0);
+    expect(axonRecoveryAlpha(Number.NaN, false)).toBe(0);
+  });
 });
 
 describe("AXON static ring", () => {
-  it("generates one deterministic 1400-point monochrome mask", () => {
-    const path = resolve("public/images/axon-ring.svg");
+  it("generates deterministic wide and narrow monochrome masks", () => {
     const generator = resolve("scripts/generate-axon-fallback.mjs");
-    const before = readFileSync(path, "utf8");
+    const paths = [
+      resolve("public/images/axon-ring.svg"),
+      resolve("public/images/axon-ring-narrow.svg"),
+    ];
+    const before = paths.map((path) => readFileSync(path, "utf8"));
     execFileSync(process.execPath, [generator]);
-    const after = readFileSync(path, "utf8");
-    expect(after).toBe(before);
-    expect(after.match(/<circle /g)).toHaveLength(1400);
-    expect(after).toContain("Generic AXON ring");
-    expect(after).toContain('fill="white"');
-    expect(after).not.toContain("<image");
+    paths.forEach((path, index) => {
+      const after = readFileSync(path, "utf8");
+      expect(after).toBe(before[index]);
+      expect(after.match(/<circle /g)).toHaveLength(1400);
+      expect(after).toContain("Generic AXON ring");
+      expect(after).toContain('fill="white"');
+      expect(after).not.toContain("<image");
+      expect(after).not.toContain("data-sample");
+    });
   });
 });

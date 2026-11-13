@@ -20,15 +20,23 @@ describe("AXON GPU shader contracts", () => {
     expect(shaders).toContain("p.z /= 0.65;");
     expect(shaders).toContain("p.z = sqrt(p.z * p.z + 0.0215) - sqrt(0.012)");
     expect(shaders).toContain("vec3 sdfNormal");
-    expect(shaders).toContain("cross(normalize(pos), normalize(gradient)) * 0.0005");
-    expect(shaders).toContain("pos += -gradient * sdf * 0.5");
-    expect(shaders).toContain("(origin - pos) * 0.0002 * hz");
+    expect(shaders).toContain("cross(normalize(pos), normalize(gradient)) * 0.0005 * hz");
+    expect(shaders).toContain("pos += -gradient * sdf * min(uDelta * 30.0, 1.0)");
+    expect(shaders).toContain("pos = mix(pos, origin, uRecovery)");
+    expect(shaders).not.toContain("length(pos) > 0.7");
+  });
+
+  it("uses a four-sample tetrahedral normal instead of six central differences", () => {
+    expect(shaders).toContain("vec3 gradient = e.xyy * ringSdf(point + e.xyy)");
+    expect(shaders).toContain("e.yyx * ringSdf(point + e.yyx)");
+    expect(shaders).toContain("e.yxy * ringSdf(point + e.yxy)");
+    expect(shaders).toContain("e.xxx * ringSdf(point + e.xxx)");
+    expect(shaders).not.toContain("ringSdf(point - e.");
   });
 
   it("uses the reference timestep without compounding 60Hz twice", () => {
     expect(shaders).toContain("float hz = min(uDelta * 60.0, 2.0);");
     expect(shaders).toContain("curlNoise(pos * 0.1 + vec3(uTime * 0.05)) * 0.0002 * hz");
-    expect(shaders).toContain("(origin - pos) * 0.0002 * hz");
     expect(shaders).toContain("flow * 0.0001 * hz * 0.4 * fluidDensity");
     expect(shaders).not.toContain("#define HZ 60.0");
   });
@@ -78,6 +86,11 @@ describe("AXON fluid lifecycle", () => {
     expect(fluid).toContain("AXON_FLUID.pressureIterations");
     expect(fluid).toContain("velocity");
     expect(fluid).toContain("density");
+  });
+
+  it("decays fluid density and velocity by elapsed time", () => {
+    expect(fluid).toContain("Math.pow(dissipation, step * 60)");
+    expect(fluid).toContain("pressureUniforms.uDissipation.value = Math.pow(");
   });
 
   it("exposes updates, segment splats, resizing, and disposal", () => {

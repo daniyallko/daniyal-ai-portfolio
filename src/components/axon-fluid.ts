@@ -15,6 +15,7 @@ import {
 interface FluidOptions {
   simulationSize?: number | undefined;
   dyeSize?: number | undefined;
+  pressureIterations?: number | undefined;
 }
 
 interface PingPong {
@@ -38,7 +39,11 @@ const pingPong = (size: number): PingPong => ({ read: target(size), write: targe
 
 export function createAxonFluid(
   renderer: THREE.WebGLRenderer,
-  { simulationSize = AXON_FLUID.simulationSize, dyeSize = AXON_FLUID.dyeSize }: FluidOptions = {},
+  {
+    simulationSize = AXON_FLUID.simulationSize,
+    dyeSize = AXON_FLUID.dyeSize,
+    pressureIterations = AXON_FLUID.pressureIterations,
+  }: FluidOptions = {},
 ) {
   const velocity = pingPong(simulationSize);
   const density = pingPong(dyeSize);
@@ -93,7 +98,7 @@ export function createAxonFluid(
     uPressure: { value: null as THREE.Texture | null },
     uDivergence: { value: divergence.texture },
     uTexel: { value: texel },
-    uDissipation: { value: AXON_FLUID.pressureDissipation },
+    uDissipation: { value: AXON_FLUID.pressureDissipation as number },
   };
   const gradientUniforms = {
     uPressure: { value: null as THREE.Texture | null },
@@ -129,12 +134,7 @@ export function createAxonFluid(
     field.write = previousRead;
   };
 
-  function splat(
-    from: THREE.Vector2,
-    to: THREE.Vector2,
-    delta: THREE.Vector2,
-    radius = 0.002,
-  ) {
+  function splat(from: THREE.Vector2, to: THREE.Vector2, delta: THREE.Vector2, radius = 0.002) {
     if (disposed) return;
     splatUniforms.uFrom.value.copy(from);
     splatUniforms.uTo.value.copy(to);
@@ -156,21 +156,21 @@ export function createAxonFluid(
     field: PingPong,
     source: THREE.WebGLRenderTarget,
     sourceTexel: THREE.Vector2,
-    dt: number,
+    step: number,
     dissipation: number,
   ) => {
     advectionUniforms.uVelocity.value = velocity.read.texture;
     advectionUniforms.uSource.value = source.texture;
     advectionUniforms.uTexel.value = sourceTexel;
-    advectionUniforms.uDt.value = dt;
-    advectionUniforms.uDissipation.value = dissipation;
+    advectionUniforms.uDt.value = step;
+    advectionUniforms.uDissipation.value = Math.pow(dissipation, step * 60);
     render(advectionMaterial, field.write);
     swap(field);
   };
 
   function update(dt: number) {
     if (disposed) return;
-    const step = Math.min(dt, AXON_FLUID.dt);
+    const step = Math.min(dt, 1 / 30);
     curlUniforms.uVelocity.value = velocity.read.texture;
     render(curlMaterial, curl);
 
@@ -182,7 +182,8 @@ export function createAxonFluid(
     divergenceUniforms.uVelocity.value = velocity.read.texture;
     render(divergenceMaterial, divergence);
 
-    for (let iteration = 0; iteration < AXON_FLUID.pressureIterations; iteration += 1) {
+    pressureUniforms.uDissipation.value = Math.pow(AXON_FLUID.pressureDissipation, step * 60);
+    for (let iteration = 0; iteration < pressureIterations; iteration += 1) {
       pressureUniforms.uPressure.value = pressure.read.texture;
       render(pressureMaterial, pressure.write);
       swap(pressure);
