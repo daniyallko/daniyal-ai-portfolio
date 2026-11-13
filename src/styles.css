@@ -307,7 +307,7 @@ body:has(.assistant-overlay[data-open="true"][data-entry="message"]) .home-hero 
   opacity: 0;
   transform: translate3d(0, -28px, 0) scale(.96);
 }
-body:has(.assistant-overlay[data-open="true"][data-entry="message"]) .hero-portrait {
+body:has(.assistant-overlay[data-open="true"][data-entry="message"]) .axon-hero {
   opacity: 0;
 }
 .home-hero { transition: opacity 900ms var(--ease-out-expo), transform 900ms var(--ease-out-expo); }
@@ -352,49 +352,74 @@ body:has(.assistant-overlay[data-open="true"][data-entry="message"]) .hero-portr
 }
 
 
-/* ---------- Computational portrait ---------- */
+/* ---------- AXON particle field ---------- */
 .hero-visual { isolation: isolate; }
-.hero-portrait {
+.hero-copy { position: relative; z-index: 2; }
+.hero-copy::before {
+  content: "";
+  position: absolute;
+  inset: -1.5rem -2rem;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--background) 0%, color-mix(in srgb, var(--background) 94%, transparent) 55%, transparent 100%);
+}
+@media (max-width: 1023px) {
+  .hero-copy::before {
+    inset: -1rem;
+    background: color-mix(in srgb, var(--background) 32%, transparent);
+  }
+}
+.axon-hero {
   position: absolute;
   inset: 0;
+  z-index: 0;
   overflow: hidden;
   contain: layout paint;
+  color: #506c00;
   transition: opacity 500ms var(--ease-out-expo);
 }
-.hero-portrait__stage,
-.hero-portrait__fallback {
+[data-theme="dark"] .axon-hero { color: #e4e3df; }
+.axon-hero__stage,
+.axon-hero__fallback {
   position: absolute;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
 }
-.hero-portrait__fallback {
-  object-fit: contain;
-  opacity: 1;
+.axon-hero__fallback {
+  opacity: 0.72;
+  -webkit-mask-image: url("/images/axon-ring.svg");
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: min(78vw, 70rem);
+  mask-image: url("/images/axon-ring.svg");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: min(78vw, 70rem);
+  background: currentColor;
   transition: opacity 300ms var(--ease-out-expo);
 }
-[data-theme="dark"] .hero-portrait__fallback { filter: invert(1); }
-.hero-portrait__stage {
+.axon-hero__stage {
   opacity: 0;
   transition: opacity 300ms var(--ease-out-expo);
 }
-.hero-portrait__stage canvas {
+.axon-hero__stage canvas {
   width: 100%;
   height: 100%;
   pointer-events: none;
 }
-.hero-portrait[data-enhanced="true"] .hero-portrait__stage { opacity: 1; }
-.hero-portrait[data-enhanced="true"] .hero-portrait__fallback { opacity: 0; }
+.axon-hero[data-enhanced="true"] .axon-hero__stage { opacity: 1; }
+.axon-hero[data-enhanced="true"] .axon-hero__fallback { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce), (prefers-reduced-data: reduce) {
-  .hero-portrait__stage { display: none; }
-  .hero-portrait__fallback { opacity: 1; }
+  .axon-hero__stage { display: none; }
+  .axon-hero__fallback { opacity: 1; }
 }
 
 @media (prefers-reduced-data: reduce) {
   .ambient-glow,
-  .hero-portrait__stage { display: none; }
+  .axon-hero__stage { display: none; }
 }
 
 @media (pointer: coarse) {
@@ -411,7 +436,7 @@ body:has(.assistant-overlay[data-open="true"][data-entry="message"]) .hero-portr
 /* Keep this last: equal-specificity motion rules above must not re-enable motion. */
 @media (prefers-reduced-motion: reduce) {
   .reveal, .motion-ready .reveal { opacity: 1; transform: none; transition: none; }
-  .hero-exit, .spot, .hero-enter, .assistant-overlay, .chat-message-in, .chat-empty, .chat-drawer, .voice-popover, .telemetry-popover, .voice-console, .home-hero, .hero-portrait, .hero-portrait__fallback, .breathe { transition: none; animation: none; }
+  .hero-exit, .spot, .hero-enter, .assistant-overlay, .chat-message-in, .chat-empty, .chat-drawer, .voice-popover, .telemetry-popover, .voice-console, .home-hero, .axon-hero, .axon-hero__fallback, .breathe { transition: none; animation: none; }
   .breathe::after, .caret, .signal-pulse, .hl-pulse { animation: none; }
   .ambient-glow { display: none; }
 }

@@ -1,8 +1,8 @@
 import { ClientOnly } from "@tanstack/react-router";
 import { useEffect, useRef, type ReactElement } from "react";
-import { particleBudget } from "@/lib/particle-face";
+import { axonBudget } from "@/lib/axon-field";
 
-interface HeroPortraitProps {
+interface AxonHeroProps {
   paused?: boolean;
 }
 
@@ -12,37 +12,26 @@ interface ConnectionLike {
   removeEventListener?: EventTarget["removeEventListener"];
 }
 
-function StaticPortrait(): ReactElement {
-  return (
-    <img
-      className="hero-portrait__fallback"
-      src="/images/generic-face.svg"
-      width="600"
-      height="600"
-      alt=""
-      role="presentation"
-      fetchPriority="high"
-      decoding="async"
-    />
-  );
+function StaticRing(): ReactElement {
+  return <span className="axon-hero__fallback" role="presentation" />;
 }
 
 function StaticRoot({ paused }: { paused: boolean }): ReactElement {
   return (
     <div
-      className="hero-portrait"
-      data-testid="hero-portrait"
+      className="axon-hero"
+      data-testid="axon-hero"
       data-enhanced="false"
       data-paused={String(paused)}
       aria-hidden="true"
       style={{ pointerEvents: "none" }}
     >
-      <StaticPortrait />
+      <StaticRing />
     </div>
   );
 }
 
-function LivePortrait({ paused }: { paused: boolean }): ReactElement {
+function LiveRing({ paused }: { paused: boolean }): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(paused);
@@ -83,11 +72,9 @@ function LivePortrait({ paused }: { paused: boolean }): ReactElement {
       const ticket = ++generation;
       activeCount = count;
       try {
-        const { mountParticleFace } = await import(
-          "@/components/particle-face-engine"
-        );
+        const { mountAxonField } = await import("@/components/axon-field-engine");
         if (disposed || ticket !== generation) return;
-        disposeEngine = mountParticleFace(host, {
+        disposeEngine = mountAxonField(host, {
           count,
           onReady: () => {
             if (!disposed && ticket === generation) {
@@ -108,7 +95,7 @@ function LivePortrait({ paused }: { paused: boolean }): ReactElement {
     };
 
     const syncEligibility = () => {
-      const count = particleBudget({
+      const count = axonBudget({
         width: window.innerWidth,
         coarse: coarseQuery.matches,
         reducedMotion: motionQuery.matches,
@@ -163,23 +150,23 @@ function LivePortrait({ paused }: { paused: boolean }): ReactElement {
   return (
     <div
       ref={rootRef}
-      className="hero-portrait"
-      data-testid="hero-portrait"
+      className="axon-hero"
+      data-testid="axon-hero"
       data-enhanced="false"
       data-paused={String(paused)}
       aria-hidden="true"
       style={{ pointerEvents: "none" }}
     >
-      <StaticPortrait />
-      <div ref={hostRef} className="hero-portrait__stage" />
+      <StaticRing />
+      <div ref={hostRef} className="axon-hero__stage" />
     </div>
   );
 }
 
-export function HeroPortrait({ paused = false }: HeroPortraitProps): ReactElement {
+export function AxonHero({ paused = false }: AxonHeroProps): ReactElement {
   return (
     <ClientOnly fallback={<StaticRoot paused={paused} />}>
-      <LivePortrait paused={paused} />
+      <LiveRing paused={paused} />
     </ClientOnly>
   );
 }

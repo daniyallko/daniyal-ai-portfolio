@@ -4,7 +4,7 @@ import { profile } from "@/lib/portfolio";
 import { VoiceSwitcher, useVoicePrefs } from "@/components/voice-switcher";
 import { useSpeech } from "@/hooks/use-speech";
 import { previewLine } from "@/lib/language";
-import { HeroPortrait } from "@/components/hero-portrait";
+import { AxonHero } from "@/components/axon-hero";
 
 export type AssistantRequest = { q?: string; call?: boolean };
 
@@ -138,6 +138,7 @@ export function HomeHero({
 
   return (
     <section className="home-hero hero-exit relative flex min-h-[calc(100dvh-4.5rem)] flex-col justify-center overflow-hidden text-left">
+      <AxonHero paused={assistantOpen} />
       <div className="relative z-10 mx-auto grid w-full max-w-[90rem] gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.75fr)] lg:gap-4 lg:py-16 xl:px-12">
         <div className="hero-copy flex min-w-0 flex-col items-start">
           <p
@@ -306,14 +307,13 @@ export function HomeHero({
             See the work <ArrowUpRight className="h-3.5 w-3.5 rotate-90" />
           </a>
         </div>
-        <div className="hero-visual relative min-h-[20rem] sm:min-h-[26rem] lg:min-h-[36rem]">
-          <HeroPortrait paused={assistantOpen} />
+        <div className="hero-visual relative hidden lg:block lg:min-h-[36rem]">
           <aside
             aria-hidden
             className="pointer-events-none absolute inset-y-0 right-0 hidden border-l border-hairline pl-4 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground lg:flex lg:flex-col lg:justify-between lg:py-2"
           >
             <div>
-              <span className="text-signal">01</span> / Generic mesh
+              <span className="text-signal">01</span> / Particle field
             </div>
             <div className="[writing-mode:vertical-rl]">Agentic systems · RAG · Voice</div>
             <div>

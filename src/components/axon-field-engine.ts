@@ -1,0 +1,366 @@
+import * as THREE from "three";
+import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer.js";
+import { AXON_LIGHT_COLOR, AXON_SCENE, axonFrameScale, axonOrigin, axonSplatRadius } from "@/lib/axon-field";
+import { createAxonFluid } from "./axon-fluid";
+import { particleFragmentShader, particleVertexShader, positionShader } from "./axon-shaders";
+
+interface EngineOptions {
+  count: number;
+  onReady: () => void;
+  onContextLoss: () => void;
+  simulationSize?: number;
+  dyeSize?: number;
+}
+
+function createMatcap(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Unable to create the AXON matcap");
+  const image = context.createImageData(64, 64);
+  for (let y = 0; y < 64; y += 1) {
+    for (let x = 0; x < 64; x += 1) {
+      const nx = (x / 63) * 2 - 1;
+      const ny = (y / 63) * 2 - 1;
+      const radiusSquared = nx * nx + ny * ny;
+      const nz = Math.sqrt(Math.max(0, 1 - radiusSquared));
+      const diffuse = Math.max(0, nx * -0.35 + ny * -0.5 + nz * 0.8);
+      const highlight = Math.pow(Math.max(0, nz), 18) * 0.32;
+      const value = Math.round(Math.min(1, 0.2 + diffuse * 0.65 + highlight) * 255);
+      const index = (y * 64 + x) * 4;
+      image.data[index] = value;
+      image.data[index + 1] = value;
+      image.data[index + 2] = value;
+      image.data[index + 3] = 255;
+    }
+  }
+  context.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function seededRandom(seed: number): number {
+  const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+export function mountAxonField(
+  host: HTMLElement,
+  { count, onReady, onContextLoss, simulationSize, dyeSize }: EngineOptions,
+): () => void {
+  const size = Math.sqrt(count);
+  if (!Number.isInteger(size)) throw new Error("AXON particle count must be a perfect square");
+
+  const cleanup: Array<() => void> = [];
+  let disposed = false;
+  let frameId = 0;
+  let shaderFailed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    if (frameId) cancelAnimationFrame(frameId);
+    frameId = 0;
+    for (const release of cleanup.splice(0).reverse()) release();
+  };
+
+  try {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(
+    AXON_SCENE.fov,
+    1,
+    AXON_SCENE.near,
+    AXON_SCENE.far,
+  );
+  camera.position.fromArray(AXON_SCENE.camera);
+  const renderer = new THREE.WebGLRenderer({
+    alpha: true,
+    antialias: false,
+    powerPreference: "high-performance",
+  });
+  renderer.setClearColor(0x000000, 0);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.domElement.setAttribute("aria-hidden", "true");
+  renderer.domElement.style.pointerEvents = "none";
+  renderer.domElement.style.display = "block";
+  renderer.debug.onShaderError = () => {
+    shaderFailed = true;
+  };
+  host.append(renderer.domElement);
+  cleanup.push(() => {
+    renderer.debug.onShaderError = null;
+    renderer.dispose();
+    renderer.domElement.remove();
+  });
+
+  const fluid = createAxonFluid(renderer, { simulationSize, dyeSize });
+  cleanup.push(() => fluid.dispose());
+  const gpuCompute = new GPUComputationRenderer(size, size, renderer);
+  cleanup.push(() => gpuCompute.dispose());
+  const positionsTexture = gpuCompute.createTexture();
+  const originsTexture = gpuCompute.createTexture();
+  cleanup.push(() => {
+    positionsTexture.dispose();
+    originsTexture.dispose();
+  });
+  const origins = originsTexture.image.data as Float32Array;
+  const positions = positionsTexture.image.data as Float32Array;
+
+  for (let index = 0; index < size * size; index += 1) {
+    const u = seededRandom(index + 1) * Math.PI * 2;
+    const v = seededRandom(index + 17011) * Math.PI * 2;
+    const point = axonOrigin(u, v);
+    const offset = index * 4;
+    origins[offset] = point[0];
+    origins[offset + 1] = point[1];
+    origins[offset + 2] = point[2];
+    const seed = seededRandom(index + 34019);
+    origins[offset + 3] = seed;
+    positions[offset] = point[0];
+    positions[offset + 1] = point[1];
+    positions[offset + 2] = point[2];
+    positions[offset + 3] = seed;
+  }
+
+  const positionVariable = gpuCompute.addVariable("texturePosition", positionShader, positionsTexture);
+  gpuCompute.setVariableDependencies(positionVariable, [positionVariable]);
+  const positionUniforms = {
+    uOrigins: { value: originsTexture },
+    uFluidVelocity: { value: fluid.velocity.read.texture as THREE.Texture },
+    uFluidDensity: { value: fluid.density.read.texture as THREE.Texture },
+    uViewProjection: { value: new THREE.Matrix4() },
+    uTime: { value: 0 },
+    uDelta: { value: 1 / 60 },
+  };
+  Object.assign(positionVariable.material.uniforms, positionUniforms);
+  const initializationError = gpuCompute.init();
+  if (initializationError) throw new Error(initializationError);
+
+  const geometry = new THREE.BufferGeometry();
+  cleanup.push(() => geometry.dispose());
+  const vertices = new Float32Array(size * size * 3);
+  const references = new Float32Array(size * size * 2);
+  const random = new Float32Array(size * size * 3);
+  for (let index = 0; index < size * size; index += 1) {
+    references[index * 2] = ((index % size) + 0.5) / size;
+    references[index * 2 + 1] = (Math.floor(index / size) + 0.5) / size;
+    random[index * 3] = seededRandom(index + 51001);
+    random[index * 3 + 1] = seededRandom(index + 68003);
+    random[index * 3 + 2] = seededRandom(index + 85007);
+  }
+  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  geometry.setAttribute("aReference", new THREE.BufferAttribute(references, 2));
+  geometry.setAttribute("aRandom", new THREE.BufferAttribute(random, 3));
+
+  const matcap = createMatcap();
+  cleanup.push(() => matcap.dispose());
+  const particleUniforms = {
+    uPositions: { value: gpuCompute.getCurrentRenderTarget(positionVariable).texture as THREE.Texture },
+    uMatcap: { value: matcap },
+    uLightColor: { value: new THREE.Color(AXON_LIGHT_COLOR) },
+    uDarkColor: { value: new THREE.Color("#e4e3df") },
+    uLavender: { value: new THREE.Color("#b8a8d8") },
+    uDark: { value: 1 },
+    uPixelRatio: { value: renderer.getPixelRatio() },
+    uViewportHeight: { value: 900 },
+  };
+  const material = new THREE.ShaderMaterial({
+    vertexShader: particleVertexShader,
+    fragmentShader: particleFragmentShader,
+    uniforms: particleUniforms,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const points = new THREE.Points(geometry, material);
+  cleanup.push(() => material.dispose());
+  points.frustumCulled = false;
+  const group = new THREE.Group();
+  group.position.fromArray(AXON_SCENE.position);
+  group.rotation.set(
+    THREE.MathUtils.degToRad(AXON_SCENE.rotation[0]),
+    THREE.MathUtils.degToRad(AXON_SCENE.rotation[1]),
+    THREE.MathUtils.degToRad(AXON_SCENE.rotation[2]),
+  );
+  group.scale.fromArray(AXON_SCENE.scale);
+  group.add(points);
+  scene.add(group);
+  cleanup.push(() => {
+    scene.remove(group);
+    group.remove(points);
+  });
+
+  let ready = true;
+  let announcedReady = false;
+  let previousTime = 0;
+  let elapsed = 0;
+  let pointerActive = false;
+  let pointerFrom = new THREE.Vector2();
+  let pointerTo = new THREE.Vector2();
+  let pointerDelta = new THREE.Vector2();
+  const gaze = new THREE.Vector2();
+  const gazeTarget = new THREE.Vector2();
+  const baseCamera = new THREE.Vector3().fromArray(AXON_SCENE.camera);
+  const viewProjection = new THREE.Matrix4();
+
+  const isDark = () => {
+    const theme = document.documentElement.dataset["theme"];
+    return theme
+      ? theme === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  };
+  const syncTheme = () => {
+    const dark = isDark();
+    particleUniforms.uDark.value = dark ? 1 : 0;
+    material.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending;
+  };
+  syncTheme();
+  const themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+  cleanup.push(() => themeObserver.disconnect());
+
+  const resize = () => {
+    const { width, height } = host.getBoundingClientRect();
+    if (width <= 0 || height <= 0) return;
+    renderer.setSize(width, height, false);
+    const frameScale = axonFrameScale(width, height);
+    camera.aspect = width / height;
+    camera.zoom = 1 / frameScale;
+    camera.updateProjectionMatrix();
+    particleUniforms.uViewportHeight.value = height;
+    fluid.resize(width, height);
+  };
+  const resizeObserver =
+    typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
+  resizeObserver?.observe(host);
+  window.addEventListener("resize", resize, { passive: true });
+  cleanup.push(() => {
+    resizeObserver?.disconnect();
+    window.removeEventListener("resize", resize);
+  });
+  resize();
+
+  const onPointerMove = (event: PointerEvent) => {
+    const bounds = host.getBoundingClientRect();
+    if (
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom
+    ) {
+      pointerActive = false;
+      gazeTarget.set(0, 0);
+      return;
+    }
+    const next = new THREE.Vector2(
+      (event.clientX - bounds.left) / bounds.width,
+      1 - (event.clientY - bounds.top) / bounds.height,
+    );
+    pointerFrom = pointerActive ? pointerTo.clone() : next.clone();
+    pointerTo = next;
+    pointerDelta = pointerTo.clone().sub(pointerFrom);
+    pointerActive = true;
+    gazeTarget.set(pointerTo.x * 2 - 1, pointerTo.y * 2 - 1);
+  };
+  const onPointerLeave = () => {
+    pointerActive = false;
+    gazeTarget.set(0, 0);
+  };
+  window.addEventListener("pointermove", onPointerMove, { passive: true });
+  document.documentElement.addEventListener("pointerleave", onPointerLeave, { passive: true });
+  cleanup.push(() => {
+    document.documentElement.removeEventListener("pointerleave", onPointerLeave);
+    window.removeEventListener("pointermove", onPointerMove);
+  });
+
+  const shouldAnimate = () =>
+    !disposed &&
+    ready &&
+    host.parentElement?.dataset["paused"] !== "true" &&
+    document.visibilityState === "visible";
+  const syncAnimation = () => {
+    if (!shouldAnimate()) {
+      if (frameId) cancelAnimationFrame(frameId);
+      frameId = 0;
+      previousTime = 0;
+      return;
+    }
+    if (!frameId) frameId = requestAnimationFrame(frame);
+  };
+
+  const frame = (time: number) => {
+    frameId = 0;
+    if (!shouldAnimate()) return;
+    const dt = previousTime ? Math.min((time - previousTime) / 1000, 1 / 30) : 1 / 60;
+    previousTime = time;
+    elapsed += dt;
+
+    if (pointerActive && pointerDelta.lengthSq() > 0) {
+      fluid.splat(pointerFrom, pointerTo, pointerDelta, axonSplatRadius(count));
+      pointerDelta.set(0, 0);
+    }
+    fluid.update(dt);
+    positionUniforms.uFluidVelocity.value = fluid.velocity.read.texture;
+    positionUniforms.uFluidDensity.value = fluid.density.read.texture;
+    positionUniforms.uTime.value = elapsed;
+    positionUniforms.uDelta.value = dt;
+
+    gaze.lerp(gazeTarget, 0.05);
+    camera.position.set(baseCamera.x + gaze.x * 0.08, baseCamera.y + gaze.y * 0.06, baseCamera.z);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    group.updateMatrixWorld();
+    viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    viewProjection.multiply(group.matrixWorld);
+    positionUniforms.uViewProjection.value.copy(viewProjection);
+
+    gpuCompute.compute();
+    particleUniforms.uPositions.value = gpuCompute.getCurrentRenderTarget(positionVariable).texture;
+    renderer.setRenderTarget(null);
+    renderer.render(scene, camera);
+    if (shaderFailed) {
+      dispose();
+      onContextLoss();
+      return;
+    }
+    if (!announcedReady && !shaderFailed) {
+      announcedReady = true;
+      onReady();
+    }
+    frameId = requestAnimationFrame(frame);
+  };
+
+  const pauseObserver = new MutationObserver(syncAnimation);
+  if (host.parentElement) {
+    pauseObserver.observe(host.parentElement, {
+      attributes: true,
+      attributeFilter: ["data-paused"],
+    });
+  }
+  document.addEventListener("visibilitychange", syncAnimation);
+  cleanup.push(() => {
+    pauseObserver.disconnect();
+    document.removeEventListener("visibilitychange", syncAnimation);
+  });
+
+  const onContextLost = (event: Event) => {
+    event.preventDefault();
+    dispose();
+    onContextLoss();
+  };
+  renderer.domElement.addEventListener("webglcontextlost", onContextLost);
+  cleanup.push(() => renderer.domElement.removeEventListener("webglcontextlost", onContextLost));
+  syncAnimation();
+
+  return dispose;
+  } catch (error) {
+    dispose();
+    throw error;
+  }
+}

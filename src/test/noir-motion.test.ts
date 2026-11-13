@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const css = read("src/styles.css");
-const portrait = read("src/components/hero-portrait.tsx");
-const engine = read("src/components/particle-face-engine.ts");
+const portrait = read("src/components/axon-hero.tsx");
+const engine = read("src/components/axon-field-engine.ts");
 const hero = read("src/components/home-hero.tsx");
 const overlay = read("src/lib/overlay-motion.ts");
 const orb = read("src/components/voice-diagnostics.tsx");
@@ -38,8 +38,8 @@ function keyframesBody(name: string) {
 
 describe("Noir motion and reduced-data safeguards", () => {
   it("disables portrait, reveal, caret, and cinematic motion", () => {
-    expect(reducedPortraitBlock).toContain(".hero-portrait__stage");
-    expect(reducedPortraitBlock).toContain(".hero-portrait__fallback");
+    expect(reducedPortraitBlock).toContain(".axon-hero__stage");
+    expect(reducedPortraitBlock).toContain(".axon-hero__fallback");
     expect(reducedPortraitBlock).toContain("opacity: 1");
     for (const name of [
       "reveal",
@@ -65,12 +65,12 @@ describe("Noir motion and reduced-data safeguards", () => {
       ".chat-message-in {",
       ".voice-popover, .telemetry-popover {",
       ".home-hero {",
-      ".hero-portrait__fallback {",
+      ".axon-hero__fallback {",
     ]) {
       expect(css.indexOf(declaration), declaration).toBeLessThan(override);
     }
     const finalBlock = css.slice(override);
-    for (const name of ["hero-enter", "home-hero", "hero-portrait__fallback", "hl-pulse", "breathe"]) {
+    for (const name of ["hero-enter", "home-hero", "axon-hero__fallback", "hl-pulse", "breathe"]) {
       expect(finalBlock).toContain(`.${name}`);
     }
     expect(finalBlock).toContain("transition: none");
@@ -94,7 +94,7 @@ describe("Noir motion and reduced-data safeguards", () => {
 
   it("removes decorative overlays and the live renderer for reduced data", () => {
     expect(reducedDataBlock).toMatch(
-      /\.ambient-glow,\s*\.hero-portrait__stage\s*\{\s*display:\s*none;/,
+      /\.ambient-glow,\s*\.axon-hero__stage\s*\{\s*display:\s*none;/,
     );
     expect(portrait).toContain("reducedData: dataQuery.matches");
     expect(portrait).toContain("connection?.saveData");

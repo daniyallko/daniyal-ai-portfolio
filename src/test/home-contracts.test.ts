@@ -28,10 +28,11 @@ describe("homepage preservation contracts", () => {
     expect(source).toContain("skills.map((s, i)");
   });
 
-  it("mounts one computational portrait in HomeHero outside the editorial wrapper", () => {
+  it("mounts one AXON field behind the complete HomeHero", () => {
     expect(source).toContain('<HomeHero onOpen={assistant.go} assistantOpen={assistant.open} />');
-    expect(hero.match(/<HeroPortrait paused=\{assistantOpen\}\s*\/>/g)).toHaveLength(1);
+    expect(hero.match(/<AxonHero paused=\{assistantOpen\}\s*\/>/g)).toHaveLength(1);
     expect(hero).not.toContain("HeroBuilding");
+    expect(hero).not.toContain("HeroPortrait");
     expect(source).not.toContain("function Hero()");
     expect(source).toMatch(/<main id="top"[^>]*>\s*<HomeHero onOpen=\{assistant\.go\} assistantOpen=\{assistant\.open\} \/>/);
     expect(source).toMatch(

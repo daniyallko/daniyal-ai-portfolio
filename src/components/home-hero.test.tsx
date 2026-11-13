@@ -12,9 +12,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/hooks/use-speech", () => ({
   useSpeech: () => ({ id: null, state: "idle", error: null, speak: mocks.speak, stop: mocks.stop }),
 }));
-vi.mock("@/components/hero-portrait", () => ({
-  HeroPortrait: ({ paused = false }: { paused?: boolean }) => (
-    <div data-testid="hero-portrait" data-paused={String(paused)} aria-hidden="true" />
+vi.mock("@/components/axon-hero", () => ({
+  AxonHero: ({ paused = false }: { paused?: boolean }) => (
+    <div data-testid="axon-hero" data-paused={String(paused)} aria-hidden="true" />
   ),
 }));
 vi.mock("@/components/voice-switcher", () => ({
@@ -68,7 +68,7 @@ describe("HomeHero", () => {
       onOpen.mock.invocationCallOrder[0]!,
     );
     expect(input).toHaveValue("");
-    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("preserves every suggestion query and live voice request", () => {
@@ -99,13 +99,13 @@ describe("HomeHero", () => {
 
   it("pauses the portrait while the assistant is open", () => {
     const view = render(<HomeHero onOpen={vi.fn()} assistantOpen={false} />);
-    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("data-paused", "false");
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-paused", "false");
 
     view.rerender(<HomeHero onOpen={vi.fn()} assistantOpen={true} />);
-    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("data-paused", "true");
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-paused", "true");
 
     view.rerender(<HomeHero onOpen={vi.fn()} assistantOpen={false} />);
-    expect(screen.getByTestId("hero-portrait")).toHaveAttribute("data-paused", "false");
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-paused", "false");
   });
 
   it("uses one stable prompt without a typewriter caret", () => {
