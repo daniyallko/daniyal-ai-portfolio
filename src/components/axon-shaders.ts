@@ -146,7 +146,6 @@ export const advectionShader = /* glsl */ `
 `;
 
 export const positionShader = /* glsl */ `
-  #define HZ 60.0
   uniform sampler2D uOrigins;
   uniform sampler2D uFluidVelocity;
   uniform sampler2D uFluidDensity;
@@ -154,21 +153,20 @@ export const positionShader = /* glsl */ `
   uniform float uTime;
   uniform float uDelta;
 
-  vec3 rotateQuaternion(vec3 point, vec4 quaternion) {
-    return point + 2.0 * cross(quaternion.xyz, cross(quaternion.xyz, point) + quaternion.w * point);
-  }
-
   float ringSdf(vec3 point) {
-    vec3 p = rotateQuaternion(point, vec4(0.5, 0.5, 0.5, 0.5));
+    vec3 p = point / 0.6;
+    p.y /= 1.25;
+    p.z /= 0.65;
     p.z = sqrt(p.z * p.z + 0.0215) - sqrt(0.012);
     float angle = atan(p.y, p.x);
     float twist = 0.35 * sin(angle * 2.0) + 0.3;
-    float major = 0.43 + 0.025 * sin(angle * 3.0);
+    float tube = 0.16 - 0.035 * sin(angle) + 0.012 * sin(angle * 3.0);
+    float major = 0.47 + 0.035 * sin(angle * 3.0) + 0.015 * (cos(angle * 5.0) - 1.0);
     vec2 section = vec2(length(p.xy) - major, p.z);
     float cosine = cos(twist);
     float sine = sin(twist);
     section = mat2(cosine, -sine, sine, cosine) * section;
-    return length(section) - 0.18;
+    return (length(section) - tube) * 0.6;
   }
 
   vec3 sdfNormal(vec3 point) {
@@ -201,22 +199,24 @@ export const positionShader = /* glsl */ `
     vec4 data = texture2D(texturePosition, uv);
     vec3 pos = data.xyz;
     vec3 origin = texture2D(uOrigins, uv).xyz;
+    float hz = min(uDelta * 60.0, 2.0);
+    if (length(pos) > 0.7) pos /= 2.0;
+
     float sdf = ringSdf(pos);
     vec3 gradient = sdfNormal(pos);
-    vec3 curl = curlNoise(origin * 2.2 + vec3(uTime * 0.025));
-    vec3 flow = curl * 0.00035 * HZ;
-    flow += cross(normalize(pos), normalize(gradient)) * 0.0005;
-    flow += (origin - pos) * 0.0002 * HZ;
+    pos += curlNoise(pos * 0.1 + vec3(uTime * 0.05)) * 0.0002 * hz;
+    pos += cross(normalize(pos), normalize(gradient)) * 0.0005;
+    pos += -gradient * sdf * 0.5;
+    pos += (origin - pos) * 0.0002 * hz;
 
     vec4 clip = uViewProjection * vec4(pos, 1.0);
     vec2 fluidUv = clip.xy / max(clip.w, 0.0001) * 0.5 + 0.5;
     float inside = step(0.0, fluidUv.x) * step(fluidUv.x, 1.0) * step(0.0, fluidUv.y) * step(fluidUv.y, 1.0);
     vec2 fluidVelocity = texture2D(uFluidVelocity, clamp(fluidUv, 0.0, 1.0)).xy;
     float fluidDensity = texture2D(uFluidDensity, clamp(fluidUv, 0.0, 1.0)).x;
-    flow += vec3(fluidVelocity, fluidVelocity.x - fluidVelocity.y) * (0.0008 + fluidDensity * 0.0015) * inside;
+    vec3 flow = vec3(fluidVelocity, 0.0);
+    pos += flow * 0.0001 * hz * 0.4 * fluidDensity * inside;
 
-    pos += flow * min(uDelta * HZ, 2.0);
-    pos += -gradient * sdf * 0.5;
     gl_FragColor = vec4(pos, data.w);
   }
 `;

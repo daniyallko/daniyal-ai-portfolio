@@ -58,11 +58,30 @@ describe("AXON budgets and reference configuration", () => {
     expect(AXON_LIGHT_COLOR).toBe("#506c00");
   });
 
+  it("faces the torus opening toward the camera before scene rotation", () => {
+    const [x, y, z] = axonOrigin(0, 0);
+    expect(x).toBeGreaterThan(0.33);
+    expect(y).toBeCloseTo(0, 12);
+    expect(z).toBeCloseTo(0.6 * 0.65 * 0.16 * Math.sin(0.3), 12);
+  });
+
+  it("keeps a large central opening and a tall reference silhouette", () => {
+    expect(axonRingSdf([0, 0, 0])).toBeCloseTo(0.187, 3);
+    let horizontal = 0;
+    let vertical = 0;
+    for (let index = 0; index < 1000; index += 1) {
+      const [x, y] = axonOrigin(index * 0.17, index * 0.31);
+      horizontal = Math.max(horizontal, Math.abs(x));
+      vertical = Math.max(vertical, Math.abs(y));
+    }
+    expect(vertical / horizontal).toBeGreaterThan(1.2);
+  });
+
   it("keeps sampled origins on the same rotated SDF zero surface", () => {
     let maximumDistance = 0;
     for (let index = 1; index <= 1000; index += 1) {
-      const u = ((Math.sin(index * 12.9898) * 43758.5453) % 1 + 1) % 1 * Math.PI * 2;
-      const v = ((Math.sin(index * 78.233) * 12345.6789) % 1 + 1) % 1 * Math.PI * 2;
+      const u = ((((Math.sin(index * 12.9898) * 43758.5453) % 1) + 1) % 1) * Math.PI * 2;
+      const v = ((((Math.sin(index * 78.233) * 12345.6789) % 1) + 1) % 1) * Math.PI * 2;
       maximumDistance = Math.max(maximumDistance, Math.abs(axonRingSdf(axonOrigin(u, v))));
     }
     expect(maximumDistance).toBeLessThan(0.000001);

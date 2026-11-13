@@ -30,56 +30,40 @@ export const AXON_SCENE = {
   scale: [5, 5, 6],
 } as const;
 
-export function axonBudget({
-  width,
-  coarse,
-  reducedMotion,
-  reducedData,
-}: AxonBudgetInput): number {
+export function axonBudget({ width, coarse, reducedMotion, reducedData }: AxonBudgetInput): number {
   if (reducedMotion || reducedData) return 0;
   return coarse || width < 768 ? AXON_MOBILE_COUNT : AXON_DESKTOP_COUNT;
 }
 
 export type AxonPoint = readonly [number, number, number];
 
-function rotatePoint(
-  [x, y, z]: AxonPoint,
-  [qx, qy, qz, qw]: readonly [number, number, number, number],
-): [number, number, number] {
-  const ix = qw * x + qy * z - qz * y;
-  const iy = qw * y + qz * x - qx * z;
-  const iz = qw * z + qx * y - qy * x;
-  const iw = -qx * x - qy * y - qz * z;
-  return [
-    ix * qw + iw * -qx + iy * -qz - iz * -qy,
-    iy * qw + iw * -qy + iz * -qx - ix * -qz,
-    iz * qw + iw * -qz + ix * -qy - iy * -qx,
-  ];
-}
-
 export function axonOrigin(u: number, v: number): [number, number, number] {
   const twist = 0.35 * Math.sin(u * 2) + 0.3;
-  const major = 0.43 + 0.025 * Math.sin(u * 3);
-  const depth = 0.18 * Math.sin(v + twist);
-  const mirroredDepth = Math.sqrt(depth * depth + 0.0215) - Math.sqrt(0.012);
-  const surfaceRadius = Math.sqrt(Math.max(0, 0.18 * 0.18 - mirroredDepth * mirroredDepth));
+  const tube = 0.16 - 0.035 * Math.sin(u) + 0.012 * Math.sin(u * 3);
+  const major = 0.47 + 0.035 * Math.sin(u * 3) + 0.015 * (Math.cos(u * 5) - 1);
+  const depth = 0.65 * tube * Math.sin(v + twist);
+  const mirroredDepth = Math.sqrt((depth / 0.65) ** 2 + 0.0215) - Math.sqrt(0.012);
+  const surfaceRadius = Math.sqrt(Math.max(0, tube * tube - mirroredDepth * mirroredDepth));
   const radius = major + surfaceRadius * (Math.cos(v + twist) < 0 ? -1 : 1);
-  return rotatePoint(
-    [radius * Math.cos(u), radius * Math.sin(u), depth],
-    [-0.5, -0.5, -0.5, 0.5],
-  );
+  return [0.6 * radius * Math.cos(u), 0.6 * 1.25 * radius * Math.sin(u), 0.6 * depth];
 }
 
 export function axonRingSdf(point: AxonPoint): number {
-  let [x, y, z] = rotatePoint(point, [0.5, 0.5, 0.5, 0.5]);
+  const [px, py, pz] = point;
+  const x = px / 0.6;
+  const rawY = py / 0.6;
+  const rawZ = pz / 0.6;
+  const y = rawY / 1.25;
+  let z = rawZ / 0.65;
   z = Math.sqrt(z * z + 0.0215) - Math.sqrt(0.012);
   const angle = Math.atan2(y, x);
   const twist = 0.35 * Math.sin(angle * 2) + 0.3;
-  const major = 0.43 + 0.025 * Math.sin(angle * 3);
+  const tube = 0.16 - 0.035 * Math.sin(angle) + 0.012 * Math.sin(angle * 3);
+  const major = 0.47 + 0.035 * Math.sin(angle * 3) + 0.015 * (Math.cos(angle * 5) - 1);
   const radial = Math.hypot(x, y) - major;
   const sectionX = Math.cos(twist) * radial - Math.sin(twist) * z;
   const sectionZ = Math.sin(twist) * radial + Math.cos(twist) * z;
-  return Math.hypot(sectionX, sectionZ) - 0.18;
+  return (Math.hypot(sectionX, sectionZ) - tube) * 0.6;
 }
 
 export function axonFrameScale(width: number, height: number): number {
