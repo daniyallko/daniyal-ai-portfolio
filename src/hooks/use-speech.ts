@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { prepareForSpeech } from "@/lib/speech";
 import { polyglotFirstClause } from "@/lib/language";
 
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
 export type SpeakState = "idle" | "loading" | "playing";
 
 /**
@@ -31,6 +34,18 @@ export function useSpeech(config: SpeechVoice) {
   const ttfbRef = useRef<number | null>(null);
   const [ttfbMs, setTtfbMs] = useState<number | null>(null);
 
+  // One persistent element, unlocked inside the user's tap, reused for every chunk:
+  // mobile browsers block play() on new Audio() created after the gesture expires.
+  const getAudio = () => {
+    if (!audioRef.current) audioRef.current = new Audio();
+    return audioRef.current;
+  };
+  const unlock = () => {
+    const a = getAudio();
+    a.src = SILENT_WAV;
+    a.play().catch(() => {});
+  };
+
   const stop = useCallback(() => {
     tokenRef.current += 1;
     idRef.current = null;
@@ -41,8 +56,6 @@ export function useSpeech(config: SpeechVoice) {
       a.onended = null;
       a.onerror = null;
       a.pause();
-      a.src = "";
-      audioRef.current = null;
     }
     if (urlRef.current) {
       URL.revokeObjectURL(urlRef.current);
@@ -64,6 +77,7 @@ export function useSpeech(config: SpeechVoice) {
         return;
       }
       stop();
+      unlock();
       setError(null);
       const token = tokenRef.current;
       idRef.current = key;
@@ -109,8 +123,8 @@ export function useSpeech(config: SpeechVoice) {
           if (urlRef.current) URL.revokeObjectURL(urlRef.current);
           const url = URL.createObjectURL(blob);
           urlRef.current = url;
-          const audio = new Audio(url);
-          audioRef.current = audio;
+          const audio = getAudio();
+          audio.src = url;
           audio.onended = () => resolve();
           audio.onerror = () => reject(new Error("Playback failed"));
           audio.play().then(() => {
@@ -129,8 +143,8 @@ export function useSpeech(config: SpeechVoice) {
           // Pre-recorded clip: play instantly; fall through to live synthesis if it fails.
           try {
             await new Promise<void>((resolve, reject) => {
-              const audio = new Audio(opts.src);
-              audioRef.current = audio;
+              const audio = getAudio();
+              audio.src = opts.src!;
               audio.onended = () => resolve();
               audio.onerror = () => reject(new Error("missing"));
               audio.play().then(() => {

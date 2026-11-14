@@ -151,10 +151,10 @@ export function AssistantMessage({
               type="button"
               onClick={() => onCite(s.n)}
               title={s.title}
-              className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-full border border-hairline px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:min-h-9"
+              className="flex h-6 min-w-0 items-center gap-1 rounded-full border border-hairline px-2 font-mono text-[10px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:h-7 sm:text-[11px]"
             >
-              <span className="text-signal">[{s.n}]</span>{" "}
-              <span className="max-w-[180px] truncate">{s.title}</span>
+              <span className="text-signal">[{s.n}]</span>
+              <span className="max-w-[110px] truncate sm:max-w-[180px]">{s.title}</span>
             </button>
           ))}
           {import.meta.env.DEV && (
