@@ -22,6 +22,7 @@ describe("eval metrics", () => {
   it("scores honest no-context answers without requiring an empty retrieval list", () => {
     const honest = "The available information doesn’t specify that detail.";
     expect(retrievalOutcomeScore(["weak-candidate"], [], honest)).toBe(1);
+    expect(noContextAnswerScore("I can’t help with weather forecasts.")).toBe(1);
     expect(noContextAnswerScore("He expects a compensation package of 50 LPA.")).toBe(0);
   });
   it("mrr uses the rank of the first relevant chunk", () => {
