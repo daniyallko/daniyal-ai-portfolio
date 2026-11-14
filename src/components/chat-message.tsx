@@ -9,6 +9,7 @@ export function AssistantMessage({
   m,
   onCite,
   onDev,
+  onAsk,
   onSpeak,
   speakState,
   speakDisabled,
@@ -16,14 +17,15 @@ export function AssistantMessage({
   m: Msg;
   onCite: (n: number) => void;
   onDev: () => void;
+  onAsk?: (question: string) => void;
   onSpeak: () => void;
   speakState: "idle" | "loading" | "playing";
   speakDisabled: boolean;
 }) {
   const md = linkifyContacts(m.content.replace(/\[(\d+)\](?!\()/g, "[$1](#cite-$1)"));
   const canSpeak = m.content.trim().length > 0;
-  const latest = useRef({ m, onCite });
-  latest.current = { m, onCite };
+  const latest = useRef({ m, onCite, onAsk });
+  latest.current = { m, onCite, onAsk };
   const components = useRef<MarkdownComponents | null>(null);
   if (!components.current) {
     components.current = {
@@ -39,6 +41,18 @@ export function AssistantMessage({
       ),
       a: ({ href, children }) => {
         const n = href?.startsWith("#cite-") ? Number(href.slice(6)) : null;
+        if (n == null && href === "#ask") {
+          const label = flatText(children);
+          return (
+            <button
+              type="button"
+              onClick={() => latest.current.onAsk?.(label)}
+              className="not-prose my-0.5 inline-flex min-h-10 items-center rounded-sm border border-hairline px-3 text-left text-sm text-foreground transition-colors hover:border-primary hover:text-signal focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {children}
+            </button>
+          );
+        }
         if (n == null && href === "/api/public/resume")
           return (
             <a
@@ -164,4 +178,12 @@ export function linkifyContacts(text: string): string {
   return text
     .replace(/(?<![[(:])daniyallko@gmail\.com(?![\]])/g, "[daniyallko@gmail.com](mailto:daniyallko@gmail.com)")
     .replace(/(?<![[(:+\d])\+?91[\s-]?7007[\s-]?644[\s-]?677(?![\]\d])/g, "[+91 7007644677](tel:+917007644677)");
+}
+
+function flatText(node: unknown): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(flatText).join("");
+  if (node && typeof node === "object" && "props" in node)
+    return flatText((node as { props: { children?: unknown } }).props.children);
+  return "";
 }

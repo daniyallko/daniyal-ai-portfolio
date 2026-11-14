@@ -21,9 +21,25 @@ export function detectSmallTalk(message: string): SmallTalkIntent | null {
 }
 
 const TOPICS =
-  "\n\nYou can ask me about:\n- His tech stack and AI engineering skills\n- AI BotKit and his agentic AI / RAG projects\n- His experience at Edwiser and other roles\n- How to [download his resume](/api/public/resume) or [contact him](/?hl=contact)";
+  "
+
+Tap a question to ask:
+- [What is Daniyal's tech stack?](#ask)
+- [Tell me about AI BotKit](#ask)
+- [What agentic AI and RAG projects has he built?](#ask)
+- [What did he do at Edwiser?](#ask)
+
+Or [download his resume](/api/public/resume).";
 const TOPICS_HI =
-  "\n\nआप पूछ सकते हैं:\n- उनका tech stack और AI skills\n- AI BotKit और agentic AI / RAG projects\n- Edwiser और बाकी experience\n- [Resume download करें](/api/public/resume) या [contact करें](/?hl=contact)";
+  "
+
+सवाल पर tap करें:
+- [Daniyal का tech stack क्या है?](#ask)
+- [AI BotKit के बारे में बताइए](#ask)
+- [उन्होंने कौन से agentic AI और RAG projects बनाए हैं?](#ask)
+- [Edwiser में उन्होंने क्या काम किया?](#ask)
+
+या [resume download करें](/api/public/resume)।";
 
 export function smallTalkReply(message: string, lang: string, firstTurn: boolean): string | null {
   const intent = detectSmallTalk(message);
