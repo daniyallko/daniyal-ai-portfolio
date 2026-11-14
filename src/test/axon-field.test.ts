@@ -126,18 +126,18 @@ describe("AXON budgets and reference configuration", () => {
     expect(displayed[1]).toBeCloseTo(live[1], 8);
   });
 
-  it("uses the approved 0.8 mobile splat-radius multiplier", () => {
+  it("uses the same splat radius for mobile and desktop interactions", () => {
     expect(axonSplatRadius(262144)).toBe(0.002);
-    expect(axonSplatRadius(16384)).toBe(0.0016);
+    expect(axonSplatRadius(16384)).toBe(0.002);
   });
 
-  it("reduces mobile fluid, pressure, DPR, and frame budgets without reducing density", () => {
+  it("reduces mobile particle and DPR budgets without reducing fluid quality", () => {
     expect(axonQuality(16384)).toEqual({
-      simulationSize: 128,
-      dyeSize: 256,
-      pressureIterations: 3,
+      simulationSize: 256,
+      dyeSize: 512,
+      pressureIterations: 5,
       pixelRatio: 1,
-      frameRate: 30,
+      frameRate: 60,
     });
     expect(axonQuality(262144)).toEqual({
       simulationSize: 256,

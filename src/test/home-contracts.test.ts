@@ -29,24 +29,28 @@ describe("homepage preservation contracts", () => {
   });
 
   it("mounts one AXON field behind the complete HomeHero", () => {
-    expect(source).toContain('<HomeHero onOpen={assistant.go} assistantOpen={assistant.open} />');
+    expect(source).toContain("<HomeHero onOpen={assistant.go} assistantOpen={assistant.open} />");
     expect(hero.match(/<AxonHero paused=\{assistantOpen\}\s*\/>/g)).toHaveLength(1);
     expect(hero).not.toContain("HeroBuilding");
     expect(hero).not.toContain("HeroPortrait");
     expect(source).not.toContain("function Hero()");
-    expect(source).toMatch(/<main id="top"[^>]*>\s*<HomeHero onOpen=\{assistant\.go\} assistantOpen=\{assistant\.open\} \/>/);
+    expect(source).toMatch(
+      /<main id="top"[^>]*>\s*<HomeHero onOpen=\{assistant\.go\} assistantOpen=\{assistant\.open\} \/>/,
+    );
     expect(source).toMatch(
       /<HomeHero onOpen=\{assistant\.go\} assistantOpen=\{assistant\.open\} \/>\s*<div className="[^"]*mx-auto[^"]*max-w-6xl/,
     );
   });
 
-  it("keeps dock behavior while replacing rotating copy with one stable prompt", () => {
-    expect(hero).toContain('const PROMPT = "Ask about experience, projects, architecture, or availability…"');
+  it("keeps dock behavior with portfolio-driven rotating prompts", () => {
+    expect(hero).toContain("const PROMPTS =");
+    expect(hero).toContain("setPromptIndex");
+    expect(hero).toContain("inputFocused");
     expect(hero).toContain("placeholder={");
     expect(hero).not.toContain("useTypewriter");
     expect(hero).toContain("speech.stop()");
     expect(hero).toContain("onOpen(pending)");
-    expect(hero).toContain("e.key === \"Enter\" && !e.shiftKey");
+    expect(hero).toContain('e.key === "Enter" && !e.shiftKey');
     expect(hero).toContain("<VoiceSwitcher");
     expect(hero).toContain("toggleDictation");
     expect(hero).toContain("CHIPS.map");
@@ -80,9 +84,7 @@ describe("homepage preservation contracts", () => {
 
   it("opens grounded project and skill-group questions through the existing assistant", () => {
     expect(source).toContain("const askProject = (name: string) =>");
-    expect(source).toContain(
-      "assistant.go({ q: `Tell me about Daniyal's ${name} project.` })",
-    );
+    expect(source).toContain("assistant.go({ q: `Tell me about Daniyal's ${name} project.` })");
     expect(source).toContain("onClick={() => askProject(featured.name)}");
     expect(source).toContain("onClick={() => askProject(p.name)}");
     expect(source).toContain("const askGroup = (group: string) =>");
@@ -93,9 +95,7 @@ describe("homepage preservation contracts", () => {
   });
 
   it("gives primary contact links at least 44px hit areas", () => {
-    expect(source).toMatch(
-      /href=\{`mailto:\$\{profile\.email\}`\}\s+className="[^"]*\bmin-h-11\b/,
-    );
+    expect(source).toMatch(/href=\{`mailto:\$\{profile\.email\}`\}\s+className="[^"]*\bmin-h-11\b/);
     expect(source).toMatch(
       /href=\{`tel:\$\{profile\.phone\.replace\(\/\\s\/g, ""\)\}`\}\s+className="[^"]*\bmin-h-11\b/,
     );

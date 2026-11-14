@@ -71,8 +71,8 @@ export function axonFrameScale(width: number, height: number): number {
   return Math.max(1, 0.6 / (width / height));
 }
 
-export function axonSplatRadius(count: number): number {
-  return count === AXON_MOBILE_COUNT ? 0.0016 : 0.002;
+export function axonSplatRadius(_count: number): number {
+  return 0.002;
 }
 
 export function axonProject(point: AxonPoint, width: number, height: number): [number, number] {
@@ -120,11 +120,11 @@ export function axonProject(point: AxonPoint, width: number, height: number): [n
 export function axonQuality(count: number) {
   const mobile = count === AXON_MOBILE_COUNT;
   return {
-    simulationSize: mobile ? 128 : AXON_FLUID.simulationSize,
-    dyeSize: mobile ? 256 : AXON_FLUID.dyeSize,
-    pressureIterations: mobile ? 3 : AXON_FLUID.pressureIterations,
+    simulationSize: AXON_FLUID.simulationSize,
+    dyeSize: AXON_FLUID.dyeSize,
+    pressureIterations: AXON_FLUID.pressureIterations,
     pixelRatio: mobile ? 1 : 1.25,
-    frameRate: mobile ? 30 : 60,
+    frameRate: 60,
   };
 }
 

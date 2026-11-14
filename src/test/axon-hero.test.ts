@@ -163,11 +163,11 @@ describe("AxonHero lifecycle", () => {
     expect(mountMock.mock.calls[0]![1].count).toBe(16384);
     expect(mountMock.mock.calls[0]![1]).toEqual(
       expect.objectContaining({
-        simulationSize: 128,
-        dyeSize: 256,
-        pressureIterations: 3,
+        simulationSize: 256,
+        dyeSize: 512,
+        pressureIterations: 5,
         pixelRatio: 1,
-        frameRate: 30,
+        frameRate: 60,
       }),
     );
   });
@@ -202,11 +202,11 @@ describe("AxonHero lifecycle", () => {
     expect(mountMock.mock.calls[0]![1].count).toBe(16384);
     expect(mountMock.mock.calls[0]![1]).toEqual(
       expect.objectContaining({
-        simulationSize: 128,
-        dyeSize: 256,
-        pressureIterations: 3,
+        simulationSize: 256,
+        dyeSize: 512,
+        pressureIterations: 5,
         pixelRatio: 1,
-        frameRate: 30,
+        frameRate: 60,
       }),
     );
   });

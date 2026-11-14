@@ -8,8 +8,6 @@ import { AxonHero } from "@/components/axon-hero";
 
 export type AssistantRequest = { q?: string; call?: boolean };
 
-const PROMPT = "Ask about experience, projects, architecture, or availability…";
-
 const CREDS = [
   "Advanced RAG",
   "LangGraph agents",
@@ -29,6 +27,13 @@ const CHIPS: { label: string; q?: string; call?: boolean }[] = [
   { label: "Availability", q: "Is Daniyal available immediately? What is his notice period?" },
 ];
 
+const PROMPTS = [
+  ...CHIPS.flatMap((chip) => (chip.q ? [chip.q] : [])),
+  ...CREDS.slice(0, 3).map(
+    (credential) => `Tell me about Daniyal's experience with ${credential}.`,
+  ),
+];
+
 export function HomeHero({
   onOpen,
   assistantOpen = false,
@@ -37,6 +42,8 @@ export function HomeHero({
   assistantOpen?: boolean;
 }) {
   const [input, setInput] = useState("");
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
   const [err, setErr] = useState<string | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -136,23 +143,22 @@ export function HomeHero({
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [input]);
 
+  useEffect(() => {
+    if (inputFocused || input || rec !== "idle") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => {
+      setPromptIndex((index) => (index + 1) % PROMPTS.length);
+    }, 3500);
+    return () => window.clearInterval(timer);
+  }, [input, inputFocused, rec]);
+
   return (
     <section className="home-hero hero-exit relative flex min-h-[calc(100dvh-4.5rem)] flex-col justify-center overflow-hidden text-left">
       <AxonHero paused={assistantOpen} />
-      <div className="relative z-10 mx-auto grid w-full max-w-[90rem] gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.75fr)] lg:gap-4 lg:py-16 xl:px-12">
+      <div className="hero-landing-grid relative z-10 mx-auto grid w-full max-w-[90rem] gap-8 px-5 py-8 sm:px-8 sm:py-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.75fr)] lg:gap-4 lg:py-16 xl:px-12">
         <div className="hero-copy flex min-w-0 flex-col items-start">
-          <p
-            className="hero-enter flex items-center gap-2 rounded-full border border-hairline bg-background/55 px-3 py-1.5 font-mono text-[10px] tracking-[0.04em] text-muted-foreground backdrop-blur-md sm:text-[11px]"
-            style={{ "--enter": 0 } as React.CSSProperties}
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inset-0 animate-ping rounded-full bg-signal opacity-60 motion-reduce:hidden" />
-              <span className="relative h-2 w-2 rounded-full bg-signal" />
-            </span>
-            Immediate joiner · {profile.location} · remote or relocation
-          </p>
           <h1
-            className="hero-enter mt-7 max-w-[12ch] text-[clamp(3.25rem,7.4vw,7.5rem)] font-semibold leading-[0.86] tracking-[-0.065em] text-balance"
+            className="hero-heading hero-enter order-1 mt-0 max-w-[12ch] text-[clamp(2.75rem,7.4vw,7.5rem)] font-semibold leading-[0.86] tracking-[-0.065em] text-balance"
             style={{ "--enter": 1 } as React.CSSProperties}
           >
             Mohd Daniyal builds AI that{" "}
@@ -161,7 +167,7 @@ export function HomeHero({
             </span>
           </h1>
           <p
-            className="hero-enter mt-7 max-w-[62ch] text-[clamp(1rem,1.35vw,1.2rem)] leading-relaxed text-muted-foreground"
+            className="hero-subheading hero-enter order-2 mt-5 max-w-[62ch] text-[clamp(1.0625rem,1.35vw,1.25rem)] font-medium leading-relaxed text-foreground sm:mt-7"
             style={{ "--enter": 2 } as React.CSSProperties}
           >
             {profile.title} with 5+ years in production. Core engineer on AI BotKit, a RAG chatbot
@@ -169,7 +175,7 @@ export function HomeHero({
             WhatsApp, Telegram and multilingual voice.
           </p>
           <ul
-            className="hero-enter mt-6 flex max-w-3xl flex-wrap gap-1.5"
+            className="hero-creds hero-enter order-4 mt-5 flex max-w-3xl flex-wrap gap-1.5 lg:order-3 lg:mt-6"
             style={{ "--enter": 3 } as React.CSSProperties}
           >
             {CREDS.map((c) => (
@@ -195,14 +201,25 @@ export function HomeHero({
               e.preventDefault();
               send(input);
             }}
-            className="hero-enter hero-dock surface mt-8 w-full max-w-3xl rounded-xl p-2 text-left backdrop-blur-2xl focus-within:border-primary/60"
+            className="hero-enter hero-dock surface order-3 mt-5 w-full max-w-3xl rounded-xl p-2 text-left backdrop-blur-2xl focus-within:border-primary/60 sm:mt-8 lg:order-4"
             style={{ "--enter": 4 } as React.CSSProperties}
           >
             <div className="relative min-h-[3.25rem]">
+              {rec === "idle" && !input && (
+                <span
+                  key={promptIndex}
+                  aria-hidden="true"
+                  className="hero-prompt pointer-events-none absolute inset-x-3 top-3.5 truncate text-base text-muted-foreground"
+                >
+                  {PROMPTS[promptIndex]}
+                </span>
+              )}
               <textarea
                 ref={taRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -216,9 +233,13 @@ export function HomeHero({
                     ? "Listening… tap the mic to finish"
                     : rec === "transcribing"
                       ? "Transcribing…"
-                      : PROMPT
+                      : PROMPTS[promptIndex]
                 }
-                className="block max-h-40 w-full resize-none bg-transparent px-3 py-3.5 text-base outline-none placeholder:text-muted-foreground"
+                className={`block max-h-40 w-full resize-none bg-transparent px-3 py-3.5 text-base outline-none ${
+                  rec === "idle" && !input
+                    ? "placeholder:text-transparent"
+                    : "placeholder:text-muted-foreground"
+                }`}
               />
             </div>
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-hairline px-1 pt-2">
@@ -279,12 +300,12 @@ export function HomeHero({
             </div>
           </form>
           {(err || speech.error) && (
-            <p role="alert" className="mt-3 text-sm text-destructive">
+            <p role="alert" className="order-3 mt-3 text-sm text-destructive lg:order-4">
               {err ?? speech.error}
             </p>
           )}
           <div
-            className="hero-enter mt-4 flex flex-wrap gap-2"
+            className="hero-enter order-5 mt-4 flex flex-wrap gap-2"
             style={{ "--enter": 5 } as React.CSSProperties}
           >
             {CHIPS.map((c) => (
@@ -300,7 +321,7 @@ export function HomeHero({
           </div>
           <a
             href="#work"
-            className="hero-enter group mt-8 flex min-h-11 items-center gap-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
+            className="hero-enter group order-6 mt-8 flex min-h-11 items-center gap-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
             style={{ "--enter": 6 } as React.CSSProperties}
           >
             <span className="h-px w-10 bg-signal transition-transform duration-300 group-hover:scale-x-150 group-hover:origin-left" />
