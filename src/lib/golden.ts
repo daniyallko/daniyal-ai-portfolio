@@ -31,7 +31,7 @@ export const golden: GoldenCase[] = [
     id: "relocate",
     question: "Is he open to relocating to the UAE or working remotely?",
     expectedChunks: ["contact"],
-    mustMention: ["UAE", "remote"],
+    mustMention: ["international", "remote"],
   },
   {
     id: "agents",

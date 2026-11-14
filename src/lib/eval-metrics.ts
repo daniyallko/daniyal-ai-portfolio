@@ -8,7 +8,7 @@ export function recallAtK(retrieved: string[], expected: string[]): number {
 
 /** Honest limitation or portfolio guardrail for a question the corpus cannot answer. */
 export function noContextAnswerScore(answer: string): number {
-  return /isn['’]t specified|not (?:covered|specified|available|mentioned)|doesn['’]t (?:say|cover|include)|no (?:reliable |available )?(?:information|detail|data)|can['’]t provide|cannot (?:answer|provide)|only help with/i.test(
+  return /isn['’]t specified|not (?:covered|specified|available|mentioned)|doesn['’]t (?:say|specify|cover|include)|no (?:reliable |available )?(?:information|detail|data)|can['’]t provide|cannot (?:answer|provide)|only help with/i.test(
     answer,
   )
     ? 1

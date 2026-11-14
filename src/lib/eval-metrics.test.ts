@@ -19,7 +19,7 @@ describe("eval metrics", () => {
     expect(retrievalOutcomeScore(["a", "b"], ["b", "z"])).toBe(0.5);
   });
   it("scores honest no-context answers without requiring an empty retrieval list", () => {
-    const honest = "That detail isn’t specified in the available information.";
+    const honest = "The available information doesn’t specify that detail.";
     expect(retrievalOutcomeScore(["weak-candidate"], [], honest)).toBe(1);
     expect(noContextAnswerScore("He expects a compensation package of 50 LPA.")).toBe(0);
   });
