@@ -267,21 +267,21 @@ export function mountAxonField(
     });
     resize();
 
-    const onPointerMove = (event: PointerEvent) => {
+    const trackInteraction = (clientX: number, clientY: number) => {
       const bounds = host.getBoundingClientRect();
       if (
-        event.clientX < bounds.left ||
-        event.clientX > bounds.right ||
-        event.clientY < bounds.top ||
-        event.clientY > bounds.bottom
+        clientX < bounds.left ||
+        clientX > bounds.right ||
+        clientY < bounds.top ||
+        clientY > bounds.bottom
       ) {
         pointerActive = false;
         gazeTarget.set(0, 0);
         return;
       }
       const next = new THREE.Vector2(
-        (event.clientX - bounds.left) / bounds.width,
-        1 - (event.clientY - bounds.top) / bounds.height,
+        (clientX - bounds.left) / bounds.width,
+        1 - (clientY - bounds.top) / bounds.height,
       );
       pointerFrom = pointerActive ? pointerTo.clone() : next.clone();
       pointerTo = next;
@@ -290,6 +290,14 @@ export function mountAxonField(
       lastInteraction = performance.now();
       gazeTarget.set(pointerTo.x * 2 - 1, pointerTo.y * 2 - 1);
     };
+    const onPointerMove = (event: PointerEvent) => {
+      trackInteraction(event.clientX, event.clientY);
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      trackInteraction(touch.clientX, touch.clientY);
+    };
     const onPointerLeave = () => {
       pointerActive = false;
       gazeTarget.set(0, 0);
@@ -297,12 +305,18 @@ export function mountAxonField(
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerup", onPointerLeave, { passive: true });
     window.addEventListener("pointercancel", onPointerLeave, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onPointerLeave, { passive: true });
+    window.addEventListener("touchcancel", onPointerLeave, { passive: true });
     document.documentElement.addEventListener("pointerleave", onPointerLeave, { passive: true });
     cleanup.push(() => {
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerLeave);
       window.removeEventListener("pointercancel", onPointerLeave);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onPointerLeave);
+      window.removeEventListener("touchcancel", onPointerLeave);
     });
 
     const shouldAnimate = () =>

@@ -48,6 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -75,10 +76,7 @@ describe("HomeHero", () => {
     const onOpen = vi.fn();
     render(<HomeHero onOpen={onOpen} />);
     const suggestions = [
-      [
-        "System architecture",
-        { q: "How does AI BotKit's RAG pipeline work?" },
-      ],
+      ["System architecture", { q: "How does AI BotKit's RAG pipeline work?" }],
       ["Best projects", { q: "What are Daniyal's best projects?" }],
       ["Start voice intro", { call: true }],
       ["Availability", { q: "Is Daniyal available immediately? What is his notice period?" }],
@@ -108,14 +106,37 @@ describe("HomeHero", () => {
     expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-paused", "false");
   });
 
-  it("uses one stable prompt without a typewriter caret", () => {
+  it("rotates portfolio questions only while the input is untouched", () => {
+    vi.useFakeTimers();
     const { container } = render(<HomeHero onOpen={vi.fn()} />);
+    const getPrompt = () => container.querySelector(".hero-prompt");
+    expect(getPrompt()).not.toBeNull();
+    const first = getPrompt()!.textContent;
 
-    expect(screen.getByRole("textbox", { name: "Ask about Daniyal" })).toHaveAttribute(
-      "placeholder",
-      "Ask about experience, projects, architecture, or availability…",
+    act(() => {
+      vi.advanceTimersByTime(3600);
+    });
+    expect(getPrompt()?.textContent).not.toBe(first);
+
+    const input = screen.getByRole("textbox", { name: "Ask about Daniyal" });
+    fireEvent.focus(input);
+    const focused = getPrompt()?.textContent;
+    act(() => {
+      vi.advanceTimersByTime(7200);
+    });
+    expect(getPrompt()?.textContent).toBe(focused);
+
+    fireEvent.change(input, { target: { value: "My question" } });
+    expect(getPrompt()).toBeNull();
+  });
+
+  it("removes the availability pill and strengthens the subheading", () => {
+    render(<HomeHero onOpen={vi.fn()} />);
+    expect(screen.queryByText(/Immediate joiner/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Full Stack AI Engineer/)).toHaveClass(
+      "font-medium",
+      "text-foreground",
     );
-    expect(container.querySelector(".caret")).toBeNull();
   });
 
   it("stops capture and detaches recorder callbacks when unmounted while recording", async () => {

@@ -52,7 +52,8 @@ describe("Noir motion and reduced-data safeguards", () => {
     }
     expect(reducedMotionBlock).toContain(".caret");
     expect(reducedMotionBlock).toContain(".ambient-glow");
-    expect(hero).toContain("const PROMPT =");
+    expect(reducedMotionBlock).toContain(".hero-prompt");
+    expect(hero).toContain('window.matchMedia?.("(prefers-reduced-motion: reduce)")');
     expect(hero).not.toContain("useTypewriter");
     expect(overlay).toContain('if (reducedMotion || entry === "voice") return 0');
   });

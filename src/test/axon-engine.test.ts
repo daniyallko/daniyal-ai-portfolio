@@ -118,6 +118,15 @@ describe("AXON renderer lifecycle", () => {
     expect(engine).toContain("THREE.NormalBlending");
   });
 
+  it("continues fluid interaction through passive touch moves without blocking scroll", () => {
+    expect(engine).toContain(
+      'window.addEventListener("touchmove", onTouchMove, { passive: true })',
+    );
+    expect(engine).toContain("const touch = event.touches[0]");
+    expect(engine).toContain('window.removeEventListener("touchmove", onTouchMove)');
+    expect(engine).not.toContain('touchAction = "none"');
+  });
+
   it("listens passively and pauses from the wrapper without React state", () => {
     expect(engine).toContain(
       'window.addEventListener("pointermove", onPointerMove, { passive: true })',
