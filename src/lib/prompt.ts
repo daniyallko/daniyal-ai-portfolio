@@ -1,7 +1,7 @@
 import { GUARDRAIL } from "@/lib/voice-logic";
 import { LANGUAGE_RULE } from "@/lib/language";
 
-export const CHAT_MODEL = "openai/gpt-6-astra" as const;
+export const CHAT_MODEL = "openai/gpt-6-luna" as const;
 
 // Static base context stays first and identical across requests (provider prefix caching);
 // dynamic RAG sources are appended in the final user turn.
