@@ -6,6 +6,7 @@ import {
   citationStats,
   qualityScore,
   retrievalOutcomeScore,
+  noContextAnswerScore,
 } from "./eval-metrics";
 
 describe("eval metrics", () => {
@@ -16,6 +17,11 @@ describe("eval metrics", () => {
     expect(retrievalOutcomeScore([], [])).toBe(1);
     expect(retrievalOutcomeScore(["unrelated"], [])).toBe(0);
     expect(retrievalOutcomeScore(["a", "b"], ["b", "z"])).toBe(0.5);
+  });
+  it("scores honest no-context answers without requiring an empty retrieval list", () => {
+    const honest = "That detail isn’t specified in the available information.";
+    expect(retrievalOutcomeScore(["weak-candidate"], [], honest)).toBe(1);
+    expect(noContextAnswerScore("He expects a compensation package of 50 LPA.")).toBe(0);
   });
   it("mrr uses the rank of the first relevant chunk", () => {
     expect(mrr(["x", "y", "a"], ["a"])).toBeCloseTo(1 / 3);

@@ -6,8 +6,23 @@ export function recallAtK(retrieved: string[], expected: string[]): number {
   return expected.filter((e) => retrieved.includes(e)).length / expected.length;
 }
 
-/** Recall for answerable cases; rejection accuracy when no chunk should match. */
-export function retrievalOutcomeScore(retrieved: string[], expected: string[]): number {
+/** Honest limitation or portfolio guardrail for a question the corpus cannot answer. */
+export function noContextAnswerScore(answer: string): number {
+  return /isn['’]t specified|not (?:covered|specified|available|mentioned)|doesn['’]t (?:say|cover|include)|no (?:reliable |available )?(?:information|detail|data)|can['’]t provide|cannot (?:answer|provide)|only help with/i.test(
+    answer,
+  )
+    ? 1
+    : 0;
+}
+
+/** Recall for answerable cases; honest rejection accuracy for no-context cases. */
+export function retrievalOutcomeScore(
+  retrieved: string[],
+  expected: string[],
+  noContextAnswer?: string,
+): number {
+  if (!expected.length && noContextAnswer !== undefined)
+    return noContextAnswerScore(noContextAnswer);
   return expected.length ? recallAtK(retrieved, expected) : retrieved.length === 0 ? 1 : 0;
 }
 
