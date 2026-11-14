@@ -116,6 +116,23 @@ export const Route = createFileRoute("/api/chat")({
             let debug: Record<string, unknown> = {};
             let completed = false;
             try {
+              const { smallTalkReply } = await import("@/lib/small-talk");
+              const quick = smallTalkReply(message, detected.code, history.length === 0);
+              if (quick) {
+                text = quick;
+                debug = {
+                  outcome: "ok" satisfies ChatOutcome,
+                  cache: "small_talk",
+                  model: "none",
+                  language: detected,
+                  timingsMs: { firstToken: Date.now() - started, total: Date.now() - started },
+                };
+                send({ type: "sources", sources: [], debug });
+                send({ type: "delta", text });
+                send({ type: "done", debug, cacheEntry: null, toolCalls: [] });
+                completed = true;
+                return;
+              }
               if (cached?.entry.text) {
                 text = cached.entry.text;
                 sources = cached.entry.sources;
