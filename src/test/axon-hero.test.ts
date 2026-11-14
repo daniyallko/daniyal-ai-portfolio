@@ -133,7 +133,7 @@ afterEach(() => {
 });
 
 describe("AxonHero lifecycle", () => {
-  it("does not mount during hydration or idle prefetch", async () => {
+  it("activates automatically after the idle prefetch without pointer intent", async () => {
     let idle: IdleRequestCallback | undefined;
     const requestIdle = vi.fn((callback: IdleRequestCallback) => {
       idle = callback;
@@ -150,7 +150,8 @@ describe("AxonHero lifecycle", () => {
       idle?.({ didTimeout: false, timeRemaining: () => 50 });
       await Promise.resolve();
     });
-    expect(mountMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-enhanced", "true");
   });
 
   it("mounts immediately on touch intent inside the hero", async () => {
@@ -319,45 +320,52 @@ describe("client-only renderer contracts", () => {
     expect(source).toMatch(/renderer\.render\(scene, camera\);[\s\S]*onReady\(\)/);
   });
 
-  it("places one static ring mask behind all hero content with the exact light ink", () => {
+  it("places one rendered static ring behind all hero content in both themes", () => {
     const css = readFileSync(resolve("src/styles.css"), "utf8");
     const hero = readFileSync(resolve("src/components/home-hero.tsx"), "utf8");
     expect(css).toMatch(
       /\.axon-hero\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*z-index:\s*0;/s,
     );
     expect(css).toMatch(
-      /\.axon-hero__fallback\s*\{[^}]*mask-image:\s*url\("\/images\/axon-ring\.svg"\);[^}]*background:\s*currentColor;/s,
+      /\.axon-hero__fallback\s*\{[^}]*background-image:\s*url\("\/images\/axon-ring\.webp"\);/s,
     );
-    expect(css).toContain("-webkit-mask-size: auto 100%;");
-    expect(css).toContain("mask-size: auto 100%;");
+    expect(css).toContain("background-size: auto 100%;");
     expect(css).toMatch(
-      /@media \(max-aspect-ratio: 3\/5\)\s*\{[^}]*\.axon-hero__fallback[^}]*axon-ring-narrow\.svg/s,
+      /\[data-theme="dark"\] \.axon-hero__fallback\s*\{[^}]*axon-ring-dark\.webp/s,
     );
-    for (const property of ["image", "position", "repeat", "size"]) {
-      expect(css).toContain(`-webkit-mask-${property}:`);
-    }
+    expect(css).toMatch(
+      /@media \(max-aspect-ratio: 3\/5\)\s*\{[^}]*\.axon-hero__fallback[^}]*axon-ring-narrow\.webp/s,
+    );
+    expect(css).toMatch(
+      /@media \(max-aspect-ratio: 3\/5\)\s*\{[\s\S]*?\[data-theme="dark"\] \.axon-hero__fallback[^}]*axon-ring-narrow-dark\.webp/,
+    );
     expect(css).toMatch(/\.hero-copy::before\s*\{[^}]*background:/s);
     expect(hero).toContain('className="hero-visual relative hidden lg:block lg:min-h-[36rem]"');
-    expect(css).toContain("color: #506c00");
     expect(css).toMatch(/\.hero-copy\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*2;/s);
     expect(hero.indexOf("<AxonHero")).toBeLessThan(hero.indexOf('className="hero-copy'));
     expect(hero).not.toContain("generic-face");
   });
 
-  it("preloads the matching fallback mask with the initial document", () => {
+  it("preloads the matching rendered fallback with the initial document", () => {
     const source = readFileSync(resolve("src/routes/__root.tsx"), "utf8");
-    expect(source).toContain('href: "/images/axon-ring.svg"');
-    expect(source).toContain('href: "/images/axon-ring-narrow.svg"');
+    for (const name of [
+      "axon-ring",
+      "axon-ring-dark",
+      "axon-ring-narrow",
+      "axon-ring-narrow-dark",
+    ]) {
+      expect(source).toContain(`href: "/images/${name}.webp"`);
+    }
     expect(source).toContain('rel: "preload"');
     expect(source).toContain('as: "image"');
     expect(source).toMatch(
-      /href: "\/images\/axon-ring\.svg",\s*as: "image",\s*crossOrigin: "anonymous"/,
+      /href: "\/images\/axon-ring\.webp",\s*as: "image",\s*crossOrigin: "anonymous"/,
     );
     expect(source).toMatch(
-      /href: "\/images\/axon-ring-narrow\.svg",\s*as: "image",\s*crossOrigin: "anonymous"/,
+      /href: "\/images\/axon-ring-narrow\.webp",\s*as: "image",\s*crossOrigin: "anonymous"/,
     );
-    expect(source).toContain('media: "(min-aspect-ratio: 3/5)"');
-    expect(source).toContain('media: "(max-aspect-ratio: 3/5)"');
+    expect(source).toContain('media: "(min-aspect-ratio: 3/5) and (prefers-color-scheme: light)"');
+    expect(source).toContain('media: "(max-aspect-ratio: 3/5) and (prefers-color-scheme: dark)"');
   });
 
   it("caps DPR and disposes every owned Three.js resource", () => {
