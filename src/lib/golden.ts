@@ -151,7 +151,7 @@ export const golden: GoldenCase[] = [
     id: "podcast-fallback",
     question: "How does Code To AI Podcast handle LLM failures and messy code diffs?",
     expectedChunks: ["doc-6d20066b-3"],
-    mustMention: ["pattern-match", "raw commit hashes"],
+    mustMention: ["fallback", "raw commit hashes"],
   },
   {
     id: "stripe-rehearsal",
