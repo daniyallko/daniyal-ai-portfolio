@@ -1,3 +1,5 @@
 # Roadmap
 
-- [x] Frontend redesign (uploaded spec): obsidian/amber design system, homepage hero + unified command dock, hero→conversation transition, cursor glow, scroll reveals, CWV/safe-area — all voice/RAG/multilingual/telemetry bindings preserved (verified in browser: question handoff → streamed cited answer; 56 tests pass)
+- [ ] Switch chat and live-call RAG delegation to `openai/gpt-6-luna`; switch read-aloud to `google/gemini-2.5-flash-tts`; regenerate gateway types.
+- [ ] Add knowledge-base-grounded golden evaluation cases and warm-up questions without caching sensitive topics.
+- [ ] Run targeted and full tests, execute the expanded golden evaluation, warm the new answers, and verify chat plus speech in the preview.
