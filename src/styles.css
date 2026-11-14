@@ -591,29 +591,26 @@ body:has(.assistant-overlay[data-open="true"][data-entry="message"]) .axon-hero 
   height: 100%;
 }
 .axon-hero__fallback {
-  opacity: 0.72;
-  -webkit-mask-image: url("/images/axon-ring.svg");
-  -webkit-mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: auto 100%;
-  mask-image: url("/images/axon-ring.svg");
-  mask-position: center;
-  mask-repeat: no-repeat;
-  mask-size: auto 100%;
-  background: currentColor;
-  transition: opacity 300ms var(--ease-out-expo);
+  opacity: 1;
+  background-image: url("/images/axon-ring.webp");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: auto 100%;
+}
+[data-theme="dark"] .axon-hero__fallback {
+  background-image: url("/images/axon-ring-dark.webp");
 }
 @media (max-aspect-ratio: 3/5) {
   .axon-hero__fallback {
-    -webkit-mask-image: url("/images/axon-ring-narrow.svg");
-    -webkit-mask-size: 100% auto;
-    mask-image: url("/images/axon-ring-narrow.svg");
-    mask-size: 100% auto;
+    background-image: url("/images/axon-ring-narrow.webp");
+    background-size: 100% auto;
+  }
+  [data-theme="dark"] .axon-hero__fallback {
+    background-image: url("/images/axon-ring-narrow-dark.webp");
   }
 }
 .axon-hero__stage {
   opacity: 0;
-  transition: opacity 300ms var(--ease-out-expo);
 }
 .axon-hero__stage canvas {
   width: 100%;

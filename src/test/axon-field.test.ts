@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -113,7 +112,7 @@ describe("AXON budgets and reference configuration", () => {
   ])("overlays the narrow fallback on the live projection at %ix%i", (width, height) => {
     const css = readFileSync(resolve("src/styles.css"), "utf8");
     const narrowRule = css.match(/@media \(max-aspect-ratio: 3\/5\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-    const widthScaled = /(?:-webkit-)?mask-size:\s*100% auto/.test(narrowRule);
+    const widthScaled = /background-size:\s*100% auto/.test(narrowRule);
     const scale = widthScaled ? width / 390 : height / 844;
     const maskWidth = widthScaled ? width : 390 * scale;
     const maskHeight = widthScaled ? 844 * scale : height;
@@ -164,26 +163,5 @@ describe("AXON origin recovery", () => {
     expect(axonRecoveryAlpha(0, false)).toBe(0);
     expect(axonRecoveryAlpha(-1, false)).toBe(0);
     expect(axonRecoveryAlpha(Number.NaN, false)).toBe(0);
-  });
-});
-
-describe("AXON static ring", () => {
-  it("generates deterministic wide and narrow monochrome masks", () => {
-    const generator = resolve("scripts/generate-axon-fallback.mjs");
-    const paths = [
-      resolve("public/images/axon-ring.svg"),
-      resolve("public/images/axon-ring-narrow.svg"),
-    ];
-    const before = paths.map((path) => readFileSync(path, "utf8"));
-    execFileSync(process.execPath, [generator]);
-    paths.forEach((path, index) => {
-      const after = readFileSync(path, "utf8");
-      expect(after).toBe(before[index]);
-      expect(after.match(/<circle /g)).toHaveLength(1400);
-      expect(after).toContain("Generic AXON ring");
-      expect(after).toContain('fill="white"');
-      expect(after).not.toContain("<image");
-      expect(after).not.toContain("data-sample");
-    });
   });
 });
