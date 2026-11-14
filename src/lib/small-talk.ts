@@ -2,7 +2,7 @@
 export type SmallTalkIntent = "greeting" | "how_are_you" | "thanks" | "bye" | "identity";
 
 const norm = (s: string) =>
-  s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 
 const FILL = "(?:\\s+(?:there|all|everyone|bot|buddy|friend|daniyal|sir|team|ji|bhai|dear))*";
 const RX: [SmallTalkIntent, RegExp][] = [
