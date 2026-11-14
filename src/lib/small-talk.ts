@@ -21,7 +21,7 @@ export function detectSmallTalk(message: string): SmallTalkIntent | null {
 }
 
 const TOPICS =
-  "
+  `
 
 Tap a question to ask:
 - [What is Daniyal's tech stack?](#ask)
@@ -29,9 +29,9 @@ Tap a question to ask:
 - [What agentic AI and RAG projects has he built?](#ask)
 - [What did he do at Edwiser?](#ask)
 
-Or [download his resume](/api/public/resume).";
+Or [download his resume](/api/public/resume).`;
 const TOPICS_HI =
-  "
+  `
 
 सवाल पर tap करें:
 - [Daniyal का tech stack क्या है?](#ask)
@@ -39,7 +39,7 @@ const TOPICS_HI =
 - [उन्होंने कौन से agentic AI और RAG projects बनाए हैं?](#ask)
 - [Edwiser में उन्होंने क्या काम किया?](#ask)
 
-या [resume download करें](/api/public/resume)।";
+या [resume download करें](/api/public/resume)।`;
 
 export function smallTalkReply(message: string, lang: string, firstTurn: boolean): string | null {
   const intent = detectSmallTalk(message);
