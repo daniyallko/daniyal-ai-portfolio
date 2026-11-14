@@ -82,7 +82,8 @@ export function canonicalQuery(raw: string): string {
   return [...tokens, ...qualifiers].join(" ") || queryWords(raw).join(" ");
 }
 export function retrievalKey(raw: string, topK = 5): string {
-  return `${corpusVersion()}:r:${topK}:${fingerprint(canonicalQuery(raw))}`;
+  // r2 invalidates rankings produced before deterministic English education expansion.
+  return `${corpusVersion()}:r2:${topK}:${fingerprint(canonicalQuery(raw))}`;
 }
 export function answerKey(raw: string, promptVersion: string, lock?: string): string {
   const d = detectLanguage(raw);

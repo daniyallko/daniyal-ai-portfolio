@@ -1,6 +1,6 @@
 // Browser-safe text helpers for read-aloud. Pure, no server or DOM imports.
 
-export const SPEAK_MODEL = "google/gemini-3.1-flash-tts-preview";
+export const SPEAK_MODEL = "google/gemini-2.5-flash-tts";
 export const SPEAK_VOICE = "Kore";
 export const MAX_SPEAK_CHARS = 1800;
 

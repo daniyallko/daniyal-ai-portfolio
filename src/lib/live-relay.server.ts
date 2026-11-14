@@ -30,7 +30,7 @@ export type LiveConfig = {
 // Fill the literal model slugs from co-loaded knowledge before typechecking.
 const liveSettings = {
   liveModel: "openai/gpt-live-1",
-  backendModel: "openai/gpt-6-astra",
+  backendModel: "openai/gpt-6-luna",
 } as const;
 
 export type LiveSocket = {

@@ -5,9 +5,11 @@ import { CHAT_MODEL, CHAT_SYSTEM } from "@/lib/prompt";
 import {
   mrr,
   factCoverage,
+  missingFacts,
   citationStats,
   qualityScore,
   retrievalOutcomeScore,
+  noContextAnswerScore,
 } from "@/lib/eval-metrics";
 
 export type EvalResult = {
@@ -89,6 +91,8 @@ export const Route = createFileRoute("/api/eval")({
               }
               const cs = citationStats(answer, nSources);
               const facts = factCoverage(answer, c.mustMention);
+              const honestNoContext = c.expectNoContext ? noContextAnswerScore(answer) : 0;
+              const citeCoverage = c.expectNoContext && honestNoContext ? 1 : cs.coverage;
               const res: EvalResult = {
                 id: c.id,
                 question: c.question,
@@ -96,13 +100,15 @@ export const Route = createFileRoute("/api/eval")({
                 ...(error ? { error } : {}),
                 retrieved,
                 expected: c.expectedChunks,
-                recall: retrievalOutcomeScore(retrieved, c.expectedChunks),
+                recall: retrievalOutcomeScore(
+                  retrieved,
+                  c.expectedChunks,
+                  c.expectNoContext ? answer : undefined,
+                ),
                 mrr: mrr(retrieved, c.expectedChunks),
                 facts,
-                missing: c.mustMention.filter(
-                  (m) => !answer.toLowerCase().includes(m.toLowerCase()),
-                ),
-                citeCoverage: cs.coverage,
+                missing: missingFacts(answer, c.mustMention),
+                citeCoverage,
                 citations: cs.citations,
                 invalidCitations: cs.invalid,
                 quality: qualityScore(facts, cs.coverage, cs.invalid),
