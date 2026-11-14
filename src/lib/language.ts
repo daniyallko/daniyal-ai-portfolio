@@ -197,7 +197,10 @@ const BRIDGE: [RegExp, string][] = [
     "experience roles",
   ],
   [/कौशल|स्किल|habilidades|compétences|fähigkeiten|competências|スキル|مهارات/iu, "skills stack"],
-  [/शिक्षा|डिग्री|educación|éducation|ausbildung|educação|学歴|تعليم|padhai/iu, "education degree"],
+  [
+    /शिक्षा|डिग्री|educación|éducation|ausbildung|educação|学歴|تعليم|padhai|study|studied|college|university/iu,
+    "education degree college university",
+  ],
   [/संपर्क|ईमेल|contacto|contato|kontakt|連絡|اتصال|email/iu, "contact email"],
   [/नौकरी|कंपनी|empresa|entreprise|firma|会社|شركة|naukri/iu, "company employer"],
   [

@@ -44,8 +44,13 @@ describe("bridgeQuery", () => {
     expect(b.tokens).toEqual(expect.arrayContaining(["kubernetes", "terraform", "projects"]));
     expect(b.normalized).toContain("projects");
   });
-  it("leaves English queries untouched", () => {
+  it("leaves unrelated English queries untouched", () => {
     expect(bridgeQuery("What has he built?").normalized).toBe("What has he built?");
+  });
+  it("expands an English study question into education vocabulary", () => {
+    const b = bridgeQuery("Where did he study?");
+    expect(b.tokens).toEqual(expect.arrayContaining(["education", "degree", "university"]));
+    expect(b.normalized).toContain("education degree");
   });
   it("keeps non-Latin text in the cache key", () => {
     expect(normalizeQueryKey("प्रोजेक्ट्स बताइए")).not.toBe("");

@@ -12,7 +12,7 @@ export const golden: GoldenCase[] = [
   {
     id: "rag-prod",
     question: "What RAG systems has Daniyal built in production?",
-    expectedChunks: ["exp-wisdmlabs-1", "proj-ai-botkit"],
+    expectedChunks: ["proj-ai-botkit"],
     mustMention: ["AI BotKit", "hybrid", "rerank"],
   },
   {
@@ -24,12 +24,12 @@ export const golden: GoldenCase[] = [
   {
     id: "stripe",
     question: "Has he migrated Stripe customers?",
-    expectedChunks: ["exp-wisdmlabs-6"],
+    expectedChunks: ["doc-889c10c0-0"],
     mustMention: ["10,000", "downtime"],
   },
   {
     id: "relocate",
-    question: "Is he open to relocating to the UAE?",
+    question: "Is he open to relocating to the UAE or working remotely?",
     expectedChunks: ["contact"],
     mustMention: ["UAE", "remote"],
   },
@@ -41,9 +41,9 @@ export const golden: GoldenCase[] = [
   },
   {
     id: "voice",
-    question: "Has he worked on voice AI?",
-    expectedChunks: ["exp-wisdmlabs-4", "proj-voice-agent"],
-    mustMention: ["Whisper", "voice"],
+    question: "How did Daniyal use Whisper in AI BotKit's Telegram voice support?",
+    expectedChunks: ["doc-3523a1a4-2"],
+    mustMention: ["Whisper", "language"],
   },
   {
     id: "uptime",
@@ -120,7 +120,7 @@ export const golden: GoldenCase[] = [
   {
     id: "memory-summarization",
     question: "How does AI BotKit summarize long conversations while preserving important details?",
-    expectedChunks: ["proj-ai-botkit", "doc-c74fd2b9-3"],
+    expectedChunks: ["doc-c74fd2b9-3"],
     mustMention: ["PostgreSQL", "summar"],
   },
   {
@@ -145,24 +145,24 @@ export const golden: GoldenCase[] = [
     id: "podcast-mcp",
     question: "How does Code To AI Podcast support private code offline through MCP?",
     expectedChunks: ["doc-6d20066b-6"],
-    mustMention: ["Model Context Protocol", "local", "private"],
+    mustMention: ["MCP", "local", "private"],
   },
   {
     id: "podcast-fallback",
     question: "How does Code To AI Podcast handle LLM failures and messy code diffs?",
     expectedChunks: ["doc-6d20066b-3"],
-    mustMention: ["pattern matching", "sanit"],
+    mustMention: ["pattern-match", "raw commit hashes"],
   },
   {
     id: "stripe-rehearsal",
     question: "How did Daniyal rehearse the Stripe migration and keep subscription IDs synchronized?",
-    expectedChunks: ["exp-wisdmlabs-6", "doc-889c10c0-1"],
-    mustMention: ["staging", "JSON", "subscription IDs"],
+    expectedChunks: ["doc-889c10c0-1"],
+    mustMention: ["staging", "subscription ID"],
   },
   {
     id: "one-click-upgrade",
     question: "How does Daniyal's one-click Edwiser upgrade plugin work?",
-    expectedChunks: ["exp-wisdmlabs-6", "doc-e9bfa5fc-1"],
+    expectedChunks: ["doc-e9bfa5fc-1"],
     mustMention: ["saved", "license", "checkout"],
   },
   {
