@@ -3,6 +3,7 @@ import {
   recallAtK,
   mrr,
   factCoverage,
+  missingFacts,
   citationStats,
   qualityScore,
   retrievalOutcomeScore,
@@ -31,6 +32,11 @@ describe("eval metrics", () => {
     expect(
       factCoverage("Built on kubernetes with 99.9% uptime", ["Kubernetes", "99.9", "AWS"]),
     ).toBeCloseTo(2 / 3);
+  });
+  it("accepts equivalent numeric wording without hiding a missing fact", () => {
+    const requirements: (string | string[])[] = [["four", "4"], "core"];
+    expect(factCoverage("A team of 4 core engineers", requirements)).toBe(1);
+    expect(missingFacts("A team of five engineers", requirements)).toEqual(["four or 4", "core"]);
   });
   it("citation coverage counts cited sentences and flags out-of-range numbers", () => {
     const s = citationStats(

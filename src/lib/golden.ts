@@ -1,10 +1,12 @@
 // Golden test set: recruiter questions with the chunks that must be retrieved
 // and the facts a good answer must mention (case-insensitive substrings).
+import type { FactRequirement } from "./eval-metrics";
+
 export type GoldenCase = {
   id: string;
   question: string;
   expectedChunks: string[];
-  mustMention: string[];
+  mustMention: FactRequirement[];
   expectNoContext?: boolean;
 };
 
@@ -19,13 +21,13 @@ export const golden: GoldenCase[] = [
     id: "scale",
     question: "How many websites and users does AI BotKit serve?",
     expectedChunks: ["exp-wisdmlabs-0", "proj-ai-botkit"],
-    mustMention: ["1,000", "100,000"],
+    mustMention: [["1,000", "1000"], ["100,000", "100000"]],
   },
   {
     id: "stripe",
     question: "Has he migrated Stripe customers?",
     expectedChunks: ["doc-889c10c0-0"],
-    mustMention: ["10,000", "downtime"],
+    mustMention: [["10,000", "10000"], "downtime"],
   },
   {
     id: "relocate",
@@ -85,7 +87,7 @@ export const golden: GoldenCase[] = [
     id: "botkit-team",
     question: "How large was the AI BotKit team and what did Daniyal personally own?",
     expectedChunks: ["exp-wisdmlabs-0", "doc-7558d84f-2"],
-    mustMention: ["four", "core"],
+    mustMention: [["four", "4"], "core"],
   },
   {
     id: "channel-architecture",
@@ -115,7 +117,7 @@ export const golden: GoldenCase[] = [
     id: "streaming-handoff",
     question: "How does AI BotKit stream answers and hand over to a human?",
     expectedChunks: ["doc-c74fd2b9-2", "doc-c74fd2b9-3"],
-    mustMention: ["Server-Sent Events", "handover"],
+    mustMention: [["Server-Sent Events", "SSE"], "handover"],
   },
   {
     id: "memory-summarization",
@@ -127,7 +129,7 @@ export const golden: GoldenCase[] = [
     id: "podcast-pipeline",
     question: "How does Code To AI Podcast turn a GitHub commit or pull request into a podcast?",
     expectedChunks: ["doc-6d20066b-0", "doc-6d20066b-2"],
-    mustMention: ["GitHub", "two-host", "FFmpeg"],
+    mustMention: ["GitHub", ["two-host", "two host"], "FFmpeg"],
   },
   {
     id: "podcast-audio",
@@ -139,7 +141,7 @@ export const golden: GoldenCase[] = [
     id: "podcast-queue",
     question: "How does Code To AI Podcast queue renders, retry failures, and clean up files?",
     expectedChunks: ["doc-6d20066b-5"],
-    mustMention: ["two", "exponential backoff", "two hours"],
+    mustMention: [["two", "2"], "exponential backoff", ["two hours", "2 hours"]],
   },
   {
     id: "podcast-mcp",

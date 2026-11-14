@@ -32,11 +32,24 @@ export function mrr(retrieved: string[], expected: string[]): number {
   return i < 0 ? 0 : 1 / (i + 1);
 }
 
-/** Share of required facts mentioned in the answer. */
-export function factCoverage(answer: string, mustMention: string[]): number {
-  if (!mustMention.length) return 1;
+export type FactRequirement = string | string[];
+
+export function factMatches(answer: string, requirement: FactRequirement): boolean {
+  const alternatives = typeof requirement === "string" ? [requirement] : requirement;
   const a = answer.toLowerCase();
-  return mustMention.filter((m) => a.includes(m.toLowerCase())).length / mustMention.length;
+  return alternatives.some((m) => a.includes(m.toLowerCase()));
+}
+
+export function missingFacts(answer: string, mustMention: FactRequirement[]): string[] {
+  return mustMention
+    .filter((m) => !factMatches(answer, m))
+    .map((m) => (typeof m === "string" ? m : m.join(" or ")));
+}
+
+/** Share of required facts mentioned in the answer; alternatives count as one fact. */
+export function factCoverage(answer: string, mustMention: FactRequirement[]): number {
+  if (!mustMention.length) return 1;
+  return mustMention.filter((m) => factMatches(answer, m)).length / mustMention.length;
 }
 
 function sentences(answer: string): string[] {

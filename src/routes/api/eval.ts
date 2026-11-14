@@ -5,6 +5,7 @@ import { CHAT_MODEL, CHAT_SYSTEM } from "@/lib/prompt";
 import {
   mrr,
   factCoverage,
+  missingFacts,
   citationStats,
   qualityScore,
   retrievalOutcomeScore,
@@ -106,9 +107,7 @@ export const Route = createFileRoute("/api/eval")({
                 ),
                 mrr: mrr(retrieved, c.expectedChunks),
                 facts,
-                missing: c.mustMention.filter(
-                  (m) => !answer.toLowerCase().includes(m.toLowerCase()),
-                ),
+                missing: missingFacts(answer, c.mustMention),
                 citeCoverage,
                 citations: cs.citations,
                 invalidCitations: cs.invalid,
