@@ -635,6 +635,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
                     m={m}
                     onCite={(n) => setPanel({ msgId: m.id, tab: "sources", focus: n })}
                     onDev={() => setPanel({ msgId: m.id, tab: "dev" })}
+                    onAsk={(q) => status === "idle" && void send(q)}
                     onSpeak={() => speech.speak(m.id, m.content)}
                     speakState={speech.id === m.id ? speech.state : "idle"}
                     speakDisabled={
