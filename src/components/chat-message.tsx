@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import { useRef, type ComponentProps } from "react";
 import { Bug, Loader2, Pause, Volume2 } from "lucide-react";
 import type { Msg } from "./chat-types";
+import { Button } from "@/components/ui/button";
 
 type MarkdownComponents = NonNullable<ComponentProps<typeof ReactMarkdown>["components"]>;
 
@@ -118,7 +119,7 @@ export function AssistantMessage({
         </p>
       )}
       {(canSpeak || m.sources?.length || m.debug) && (
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
+        <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-hairline pt-2">
           {canSpeak && (
             <button
               type="button"
@@ -146,16 +147,18 @@ export function AssistantMessage({
             </button>
           )}
           {m.sources?.map((s) => (
-            <button
+            <Button
+              variant="ghost"
               key={s.n}
               type="button"
               onClick={() => onCite(s.n)}
               title={s.title}
-              className="flex h-6 min-w-0 items-center gap-1 rounded-full border border-hairline px-2 font-mono text-[10px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:h-7 sm:text-[11px]"
+              aria-label={`Source ${s.n}: ${s.title}`}
+              className="h-5 min-w-0 gap-0.5 rounded-sm border border-hairline px-1.5 py-0 font-mono text-[9px] font-normal text-muted-foreground hover:border-primary hover:text-foreground sm:text-[10px]"
             >
               <span className="text-signal">[{s.n}]</span>
-              <span className="max-w-[110px] truncate sm:max-w-[180px]">{s.title}</span>
-            </button>
+              <span className="max-w-16 truncate sm:max-w-28">{s.title}</span>
+            </Button>
           ))}
           {import.meta.env.DEV && (
             <button

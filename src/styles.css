@@ -704,6 +704,11 @@ body:has(.assistant-overlay[data-open="true"][data-entry="message"]) .axon-hero 
     position: absolute;
     inset: -12px;
   }
+  /* Reference tags are secondary to the full-size Listen control. */
+  button[aria-label^="Source "] {
+    min-width: 0;
+    min-height: 20px;
+  }
 }
 
 /* Keep this last: equal-specificity motion rules above must not re-enable motion. */
