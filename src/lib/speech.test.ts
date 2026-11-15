@@ -48,3 +48,17 @@ describe("read-aloud text", () => {
     expect(prepareForSpeech("He built a RAG pipeline")).toBe("He built a RAG pipeline.");
   });
 });
+
+import { readAloudSplit } from "./speech";
+describe("readAloudSplit", () => {
+  it("opens with at least 25 words of whole sentences", () => {
+    const t = Array.from({ length: 14 }, (_, i) => `Sentence number ${i} has exactly seven words.`).join(" ");
+    const r = readAloudSplit(t);
+    expect(r.first.split(" ").length).toBeGreaterThanOrEqual(25);
+    expect(r.first.endsWith(".")).toBe(true);
+    expect(`${r.first} ${r.rest}`).toBe(t);
+  });
+  it("keeps short answers in one piece", () => {
+    expect(readAloudSplit("Short answer here.").rest).toBe("");
+  });
+});
