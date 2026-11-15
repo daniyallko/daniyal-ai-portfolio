@@ -225,3 +225,14 @@ describe("VoiceOrb", () => {
     expect(frames).toHaveLength(frameCount);
   });
 });
+
+import { cacheTierLabel } from "./voice-diagnostics";
+describe("cacheTierLabel", () => {
+  it("labels each cache tier", () => {
+    expect(cacheTierLabel({ cache: "L2" })).toBe("L2 · edge RAM");
+    expect(cacheTierLabel({ cache: "L3" })).toBe("L3 · database");
+    expect(cacheTierLabel({ cache: "L3", browserHint: true })).toMatch(/^L1/);
+    expect(cacheTierLabel({ cache: "miss" })).toMatch(/^Miss/);
+    expect(cacheTierLabel({ cache: "small_talk" })).toMatch(/Instant/);
+  });
+});

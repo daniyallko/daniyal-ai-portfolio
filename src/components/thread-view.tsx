@@ -38,6 +38,7 @@ import { VoiceSwitcher, useVoicePrefs } from "@/components/voice-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { detectLanguage, previewLine, type DetectedLanguage } from "@/lib/language";
 import { browserCache, rememberBrowser } from "@/lib/rag-browser";
+import { cacheTierLabel, type TextStream } from "@/components/voice-diagnostics";
 import { answerKey, fingerprint, retrievalKey, type CacheEntry } from "@/lib/rag-cache";
 import { CHAT_MODEL, CHAT_SYSTEM } from "@/lib/prompt";
 
@@ -325,8 +326,13 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
     if (status === "idle" && (!embed || embed.active)) taRef.current?.focus();
   }, [status, loaded, embed?.active]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [textStream, setTextStream] = useState<TextStream | null>(null);
   const send = async (text: string) => {
     const message = text.trim();
+    const started = performance.now();
+    let firstAt: number | null = null;
+    let chunks = 0;
+    let tierDebug: Debug | undefined;
     if (!message || status !== "idle") return;
     speech.stop();
     noteLanguage(message);
@@ -372,11 +378,23 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
         for (const line of lines) {
           if (!line.trim()) continue;
           const ev = JSON.parse(line);
-          if (ev.type === "sources") patch((m) => ({ ...m, sources: ev.sources, debug: ev.debug }));
-          else if (ev.type === "delta") {
+          if (ev.type === "sources") {
+            tierDebug = ev.debug;
+            patch((m) => ({ ...m, sources: ev.sources, debug: ev.debug }));
+          } else if (ev.type === "delta") {
+            firstAt ??= performance.now();
+            chunks++;
             setStatus("streaming");
             patch((m) => ({ ...m, content: m.content + ev.text }));
           } else if (ev.type === "done") {
+            tierDebug = ev.debug ?? tierDebug;
+            const end = performance.now();
+            setTextStream({
+              tier: cacheTierLabel(tierDebug as { cache?: string; browserHint?: boolean } | undefined),
+              ttftMs: firstAt === null ? null : Math.round(firstAt - started),
+              totalMs: Math.round(end - started),
+              chunks,
+            });
             patch((m) => ({ ...m, debug: ev.debug }));
             if (ev.cacheEntry) rememberBrowser([ev.cacheEntry]);
           } else if (ev.type === "error") patch((m) => ({ ...m, error: ev.message }));
@@ -680,6 +698,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
               (lastDebug?.timingsMs?.["firstToken"] as number | null | undefined) ?? null
             }
             ragCache={lastDebug?.cache ?? null}
+            textStream={textStream}
             ragMs={
               lastDebug?.timingsMs
                 ? Number(lastDebug.timingsMs["embed"] ?? 0) +
