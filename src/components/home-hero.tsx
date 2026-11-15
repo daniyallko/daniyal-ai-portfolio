@@ -175,7 +175,7 @@ export function HomeHero({
             WhatsApp, Telegram and multilingual voice.
           </p>
           <ul
-            className="hero-creds hero-enter order-3 mt-5 flex max-w-3xl flex-wrap gap-1.5 sm:mt-6"
+            className="hero-creds hero-enter order-3 mt-5 flex max-w-3xl flex-wrap gap-1.5 sm:mt-6 sm:gap-2"
             style={{ "--enter": 3 } as React.CSSProperties}
           >
             {CREDS.map((c) => (
@@ -183,10 +183,10 @@ export function HomeHero({
                 <button
                   type="button"
                   onClick={() => send(`Tell me about Daniyal's experience with ${c}.`)}
-                  className="group flex min-h-9 items-center gap-2 rounded-md px-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                  className="group flex min-h-9 items-center gap-2 rounded-md border border-hairline bg-card/70 px-2.5 font-mono text-[11px] text-muted-foreground backdrop-blur-md transition-colors hover:border-primary/40 hover:text-foreground"
                 >
                   <span
-                    className="h-1 w-1 rounded-full bg-hairline transition-colors group-hover:bg-signal"
+                    className="h-1 w-1 rounded-full bg-muted-foreground/60 transition-colors group-hover:bg-signal"
                     aria-hidden="true"
                   />
                   {c}

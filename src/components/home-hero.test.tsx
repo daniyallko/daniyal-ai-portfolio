@@ -217,4 +217,18 @@ describe("HomeHero", () => {
     expect(box.closest("form")).toHaveClass("order-4");
     expect(box.closest("form")).not.toHaveClass("lg:order-4");
   });
+
+  it("backs every capability point with a translucent panel so it stays readable over the artwork", () => {
+    const { container } = render(<HomeHero onOpen={vi.fn()} />);
+    const chips = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(".hero-creds button"),
+    );
+
+    expect(chips).toHaveLength(6);
+    for (const chip of chips) {
+      expect(chip).toHaveClass("bg-card/70");
+      expect(chip).toHaveClass("backdrop-blur-md");
+      expect(chip).toHaveClass("border-hairline");
+    }
+  });
 });
