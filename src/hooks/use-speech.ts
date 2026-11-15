@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { prepareForSpeech } from "@/lib/speech";
-import { polyglotFirstClause } from "@/lib/language";
+import { prepareForSpeech, readAloudSplit } from "@/lib/speech";
 
 const SILENT_WAV =
   "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
@@ -113,7 +112,7 @@ export function useSpeech(config: SpeechVoice) {
       const t0 = performance.now();
       // Adaptive first-clause chunking: synthesize a short opening clause and the rest in parallel,
       // so audio starts as soon as the small first chunk is ready.
-      const fc = polyglotFirstClause(opts.prepared ? text : prepareForSpeech(text));
+      const fc = readAloudSplit(opts.prepared ? text : prepareForSpeech(text));
       const { first, rest } = fc;
       if (!opts.force) setDelimiter(fc.delimiter);
       lastRef.current = {

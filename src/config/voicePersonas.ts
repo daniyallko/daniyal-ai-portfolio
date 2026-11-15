@@ -12,12 +12,12 @@ export type VoicePersona = {
   ttsVoice: "Charon" | "Kore" | "Orus" | "Leda";
   rate: number;
   liveModel: "openai/gpt-live-1";
-  ttsModel: "google/gemini-2.5-flash-tts";
+  ttsModel: "google/gemini-3.1-flash-tts-preview";
 };
 
 const base = {
   liveModel: "openai/gpt-live-1",
-  ttsModel: "google/gemini-2.5-flash-tts",
+  ttsModel: "google/gemini-3.1-flash-tts-preview",
 } as const;
 
 export const VOICE_PERSONAS: VoicePersona[] = [

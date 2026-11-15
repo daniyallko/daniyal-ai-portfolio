@@ -2,7 +2,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSpeech } from "./use-speech";
 
-vi.mock("@/lib/speech", () => ({ prepareForSpeech: (text: string) => text }));
+vi.mock("@/lib/speech", () => ({
+  prepareForSpeech: (text: string) => text,
+  readAloudSplit: () => ({ first: "First line.", rest: "Remaining answer.", delimiter: "." }),
+}));
 vi.mock("@/lib/language", () => ({
   polyglotFirstClause: () => ({ first: "First line.", rest: "Remaining answer.", delimiter: "." }),
 }));

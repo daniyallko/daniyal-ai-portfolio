@@ -1,6 +1,6 @@
 // Browser-safe text helpers for read-aloud. Pure, no server or DOM imports.
 
-export const SPEAK_MODEL = "google/gemini-2.5-flash-tts";
+export const SPEAK_MODEL = "google/gemini-3.1-flash-tts-preview";
 export const SPEAK_VOICE = "Kore";
 export const MAX_SPEAK_CHARS = 1800;
 
@@ -72,4 +72,29 @@ export function prepareForSpeech(md: string): string {
   const t = trimForSpeech(speakableText(md));
   if (!t) return "";
   return /[.!?]$/.test(t) ? t : `${t}.`;
+}
+
+/**
+ * Split for read-aloud: the opening chunk holds whole sentences (about 25+ words, at most 45)
+ * so it keeps speaking while the remainder is still being synthesized — no silent gap.
+ */
+export function readAloudSplit(
+  text: string,
+  minWords = 25,
+  maxWords = 45,
+): { first: string; rest: string; delimiter: string | null } {
+  const s = text.trim();
+  const sentences = s.split(/(?<=[.!?\u0964\u0965\u3002\uff01\uff1f\u061f])\s+/u).filter(Boolean);
+  const words = (x: string) => x.split(/\s+/).filter(Boolean).length;
+  if (words(s) <= maxWords + 15 || sentences.length < 2) return { first: s, rest: "", delimiter: null };
+  let n = 0;
+  let i = 0;
+  while (i < sentences.length - 1 && n < minWords) {
+    const w = words(sentences[i]!);
+    if (n > 0 && n + w > maxWords) break;
+    n += w;
+    i++;
+  }
+  const first = sentences.slice(0, i).join(" ");
+  return { first, rest: sentences.slice(i).join(" "), delimiter: first.slice(-1) };
 }
