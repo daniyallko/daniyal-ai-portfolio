@@ -205,4 +205,16 @@ describe("HomeHero", () => {
     expect(input).toHaveFocus();
     expect(onOpen).not.toHaveBeenCalled();
   });
+
+  it("keeps the capability points above the chat box on every screen", () => {
+    const { container } = render(<HomeHero onOpen={vi.fn()} />);
+    const creds = container.querySelector(".hero-creds")!;
+    const box = screen.getByRole("textbox", { name: "Ask about Daniyal" });
+
+    expect(creds.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(creds).toHaveClass("order-3");
+    expect(creds).not.toHaveClass("lg:order-3");
+    expect(box.closest("form")).toHaveClass("order-4");
+    expect(box.closest("form")).not.toHaveClass("lg:order-4");
+  });
 });
