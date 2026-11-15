@@ -183,10 +183,10 @@ export function HomeHero({
                 <button
                   type="button"
                   onClick={() => send(`Tell me about Daniyal's experience with ${c}.`)}
-                  className="group flex min-h-9 items-center gap-2 rounded-md border border-hairline bg-card/70 px-2.5 font-mono text-[11px] text-muted-foreground backdrop-blur-md transition-colors hover:border-primary/40 hover:text-foreground"
+                  className="group flex min-h-9 items-center gap-2 rounded-md border border-hairline bg-card/70 px-2.5 font-mono text-[11px] text-foreground/80 backdrop-blur-md transition-colors hover:border-primary/40 hover:text-foreground"
                 >
                   <span
-                    className="h-1 w-1 rounded-full bg-muted-foreground/60 transition-colors group-hover:bg-signal"
+                    className="h-1 w-1 rounded-full bg-foreground/40 transition-colors group-hover:bg-signal"
                     aria-hidden="true"
                   />
                   {c}
