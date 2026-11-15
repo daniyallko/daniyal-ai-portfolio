@@ -68,7 +68,6 @@ export function VoiceOrb({
     c.height = H * dpr;
     g.scale(dpr, dpr);
     const css = getComputedStyle(document.documentElement);
-    const primary = `oklch(${
       css
         .getPropertyValue("--primary")
         .replace(/oklch\(|\)/g, "")
