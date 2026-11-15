@@ -52,7 +52,7 @@ describe("read-aloud text", () => {
 import { readAloudSplit } from "./speech";
 describe("readAloudSplit", () => {
   it("opens with at least 25 words of whole sentences", () => {
-    const t = Array.from({ length: 8 }, (_, i) => `Sentence number ${i} has exactly seven words.`).join(" ");
+    const t = Array.from({ length: 14 }, (_, i) => `Sentence number ${i} has exactly seven words.`).join(" ");
     const r = readAloudSplit(t);
     expect(r.first.split(" ").length).toBeGreaterThanOrEqual(25);
     expect(r.first.endsWith(".")).toBe(true);
