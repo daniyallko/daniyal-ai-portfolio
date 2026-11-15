@@ -182,7 +182,7 @@ async function answerQuestion(
       instructions:
         CHAT_SYSTEM +
         "\nThis answer will be spoken aloud: no markdown, no citation numbers, at most 70 words. Answer in the language the user spoke, keeping technical terms in English. Use the latest correction if transcripts were revised.",
-      reasoning: { effort: "low" },
+      reasoning: { effort: "minimal" },
     },
     {
       apiKey: config.key,

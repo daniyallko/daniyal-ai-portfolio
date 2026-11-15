@@ -32,12 +32,17 @@ export async function enforceRateLimit(
   request: Request,
   policies: RatePolicy[],
 ): Promise<Response | null> {
-  for (const policy of policies) {
-    const { data, error } = await supabaseAdmin.rpc("consume_rate_limit", {
-      _key: bucketKey(request, policy),
-      _limit: policy.limit,
-      _window_seconds: policy.windowSeconds,
-    });
+  // Policies are independent buckets: consume them concurrently (one round-trip of latency).
+  const results = await Promise.all(
+    policies.map((policy) =>
+      supabaseAdmin.rpc("consume_rate_limit", {
+        _key: bucketKey(request, policy),
+        _limit: policy.limit,
+        _window_seconds: policy.windowSeconds,
+      }),
+    ),
+  );
+  for (const { data, error } of results) {
     const result = data?.[0];
     if (error || !result) {
       console.error("Rate limiter unavailable", error?.message ?? "empty result");
