@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Make answer sources compact, fix complete phone read-aloud playback, and brighten the dark-mode voice orb; verify playback and mobile layout.
+- [x] Compact source pills to 20px on phones; play all read-aloud clauses in a tap-unlocked AudioContext; fix invalid orb colors. Verified real two-clause audio and mobile layout in Chromium; physical iPhone playback remains unverified.
 
 - [x] Switch chat and live-call RAG delegation to `openai/gpt-6-luna`; switch read-aloud to `google/gemini-2.5-flash-tts`; regenerate gateway types.
 - [x] Add 17 knowledge-base-grounded golden cases (31 total) and 19 warm-up questions (58 Tier 1/2 total), preserving sensitive-topic exclusions.
