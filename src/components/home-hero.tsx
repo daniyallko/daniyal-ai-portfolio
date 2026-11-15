@@ -175,7 +175,7 @@ export function HomeHero({
             WhatsApp, Telegram and multilingual voice.
           </p>
           <ul
-            className="hero-creds hero-enter order-4 mt-5 flex max-w-3xl flex-wrap gap-1.5 lg:order-3 lg:mt-6"
+            className="hero-creds hero-enter order-3 mt-5 flex max-w-3xl flex-wrap gap-1.5 sm:mt-6"
             style={{ "--enter": 3 } as React.CSSProperties}
           >
             {CREDS.map((c) => (
@@ -201,7 +201,7 @@ export function HomeHero({
               e.preventDefault();
               send(input);
             }}
-            className="hero-enter hero-dock surface order-3 mt-5 w-full max-w-3xl rounded-xl p-2 text-left backdrop-blur-2xl focus-within:border-primary/60 sm:mt-8 lg:order-4"
+            className="hero-enter hero-dock surface order-4 mt-5 w-full max-w-3xl rounded-xl p-2 text-left backdrop-blur-2xl focus-within:border-primary/60 sm:mt-8"
             style={{ "--enter": 4 } as React.CSSProperties}
           >
             <div className="relative min-h-[3.25rem]">
@@ -300,12 +300,12 @@ export function HomeHero({
             </div>
           </form>
           {(err || speech.error) && (
-            <p role="alert" className="order-3 mt-3 text-sm text-destructive lg:order-4">
+            <p role="alert" className="order-5 mt-3 text-sm text-destructive">
               {err ?? speech.error}
             </p>
           )}
           <div
-            className="hero-enter order-5 mt-4 flex flex-wrap gap-2"
+            className="hero-enter order-6 mt-4 flex flex-wrap gap-2"
             style={{ "--enter": 5 } as React.CSSProperties}
           >
             {CHIPS.map((c) => (
@@ -321,7 +321,7 @@ export function HomeHero({
           </div>
           <a
             href="#work"
-            className="hero-enter group order-6 mt-8 flex min-h-11 items-center gap-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
+            className="hero-enter group order-7 mt-8 flex min-h-11 items-center gap-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
             style={{ "--enter": 6 } as React.CSSProperties}
           >
             <span className="h-px w-10 bg-signal transition-transform duration-300 group-hover:scale-x-150 group-hover:origin-left" />
