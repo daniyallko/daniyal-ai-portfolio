@@ -143,6 +143,24 @@ export function VoiceOrb({
   );
 }
 
+export type TextStream = {
+  tier: string;
+  ttftMs: number | null;
+  totalMs: number;
+  chunks: number;
+};
+
+/** Which cache tier served a text answer: L1 browser, L2 isolate RAM, L3 database, or live RAG. */
+export function cacheTierLabel(debug: { cache?: string; browserHint?: boolean } | undefined): string {
+  const c = debug?.cache;
+  if (c === "small_talk") return "Instant reply (no AI)";
+  if (c === "L2" || c === "L3") {
+    const name = c === "L2" ? "L2 · edge RAM" : "L3 · database";
+    return debug?.browserHint ? `L1 · browser (confirmed by ${c})` : name;
+  }
+  return "Miss · live RAG + LLM";
+}
+
 export type Dispatch = { at: number; source: "voice" | "text"; action: UiAction; href: string };
 export type PrefetchLog = { query: string; cache: string; ms: number };
 
@@ -559,6 +577,7 @@ export function TelemetryPanel(props: {
   dispatches: Dispatch[];
   llmFirstTokenMs: number | null;
   ragCache: string | null;
+  textStream?: TextStream | null;
   ragMs: number | null;
   ttsTtfaMs: number | null;
   ttsTtfbMs: number | null;
@@ -749,6 +768,13 @@ export function TelemetryPanel(props: {
               <Row k="chunker flush on" v={props.delimiter ? `"${props.delimiter}"` : "—"} />
             </dl>
           </div>
+          <dl className="border-t border-border p-3">
+            <p className="mb-1 text-primary">last text answer</p>
+            <Row k="cache tier" v={props.textStream?.tier ?? "—"} />
+            <Row k="first text" v={fmt(props.textStream?.ttftMs ?? null)} />
+            <Row k="total duration" v={props.textStream ? fmt(props.textStream.totalMs) : "—"} />
+            <Row k="stream chunks" v={props.textStream ? String(props.textStream.chunks) : "—"} />
+          </dl>
           <div className="border-t border-border p-3">
             <p className="mb-1 text-primary">cross-lingual rag bridge</p>
             {props.bridge ? (
