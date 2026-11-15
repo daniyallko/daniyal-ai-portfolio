@@ -68,17 +68,10 @@ export function VoiceOrb({
     c.height = H * dpr;
     g.scale(dpr, dpr);
     const css = getComputedStyle(document.documentElement);
-      css
-        .getPropertyValue("--primary")
-        .replace(/oklch\(|\)/g, "")
-        .trim() || "0.91 0.2 122"
-    })`;
-    const muted = `oklch(${
-      css
-        .getPropertyValue("--muted-foreground")
-        .replace(/oklch\(|\)/g, "")
-        .trim() || "0.6 0 0"
-    })`;
+    // Tokens may be hex, rgb or oklch: wrapping hex in oklch produces an invalid
+    // canvas color, leaving the browser's default black stroke in dark mode.
+    const primary = css.getPropertyValue("--signal").trim();
+    const muted = css.getPropertyValue("--foreground").trim();
     const freq = new Uint8Array(128);
     let raf = 0,
       last: OrbState = "idle";
@@ -97,12 +90,12 @@ export function VoiceOrb({
       if (st === "thinking") r += Math.sin(now / 300) * 2;
       g.strokeStyle = st === "idle" ? muted : primary;
       g.fillStyle = st === "idle" ? muted : primary;
-      g.globalAlpha = 0.15;
+      g.globalAlpha = 0.3;
       g.beginPath();
       g.arc(cx, cy, r + 6, 0, Math.PI * 2);
       g.fill();
       g.globalAlpha = 1;
-      g.lineWidth = 1;
+      g.lineWidth = 2;
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
       g.stroke();
@@ -110,7 +103,7 @@ export function VoiceOrb({
         t.outAnalyser.getByteFrequencyData(freq);
         const bars = 48;
         for (let i = 0; i < bars; i++) {
-          const v = freq[Math.floor((i / bars) * 64)]! / 255;
+          const v = (freq[Math.floor((i / bars) * 64)] ?? 0) / 255;
           const a = (i / bars) * Math.PI * 2 - Math.PI / 2;
           const len = 2 + v * 20;
           g.beginPath();

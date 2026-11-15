@@ -26,6 +26,9 @@ export function useSpeech(config: SpeechVoice) {
   const [error, setError] = useState<string | null>(null);
   const idRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const contextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const finishRef = useRef<(() => void) | null>(null);
   const urlRef = useRef<string | null>(null);
   const acRef = useRef<AbortController | null>(null);
   const tokenRef = useRef(0);
@@ -44,6 +47,19 @@ export function useSpeech(config: SpeechVoice) {
     const a = getAudio();
     a.src = SILENT_WAV;
     a.play().catch(() => {});
+    // Unlock Web Audio on the tap too. A single running context plays all clauses
+    // without starting a new media playback session after the gesture expires.
+    const Context = window.AudioContext ??
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (Context) {
+      const context = contextRef.current ?? new Context();
+      contextRef.current = context;
+      void context.resume().catch(() => {});
+      const silent = context.createBufferSource();
+      silent.buffer = context.createBuffer(1, 1, context.sampleRate);
+      silent.connect(context.destination);
+      silent.start();
+    }
   };
 
   const stop = useCallback(() => {
@@ -51,6 +67,15 @@ export function useSpeech(config: SpeechVoice) {
     idRef.current = null;
     acRef.current?.abort();
     acRef.current = null;
+    const source = sourceRef.current;
+    sourceRef.current = null;
+    if (source) {
+      source.onended = null;
+      source.stop();
+      source.disconnect();
+    }
+    finishRef.current?.();
+    finishRef.current = null;
     const a = audioRef.current;
     if (a) {
       a.onended = null;
@@ -118,8 +143,35 @@ export function useSpeech(config: SpeechVoice) {
         }
         return res.blob();
       };
-      const play = (blob: Blob) =>
-        new Promise<void>((resolve, reject) => {
+      const play = async (blob: Blob) => {
+        const context = contextRef.current;
+        if (context) {
+          const buffer = await context.decodeAudioData(await blob.arrayBuffer());
+          if (token !== tokenRef.current) return;
+          if (context.state !== "running") await context.resume();
+          if (token !== tokenRef.current) return;
+          await new Promise<void>((resolve) => {
+            const source = context.createBufferSource();
+            source.buffer = buffer;
+            source.connect(context.destination);
+            sourceRef.current = source;
+            finishRef.current = resolve;
+            source.onended = () => {
+              source.disconnect();
+              if (sourceRef.current === source) sourceRef.current = null;
+              finishRef.current = null;
+              resolve();
+            };
+            source.start();
+            if (ttfaRef.current === null) {
+              ttfaRef.current = Math.round(performance.now() - t0);
+              setTtfaMs(ttfaRef.current);
+            }
+            setState("playing");
+          });
+          return;
+        }
+        await new Promise<void>((resolve, reject) => {
           if (urlRef.current) URL.revokeObjectURL(urlRef.current);
           const url = URL.createObjectURL(blob);
           urlRef.current = url;
@@ -136,6 +188,7 @@ export function useSpeech(config: SpeechVoice) {
             setState("playing");
           }, reject);
         });
+      };
       try {
         ttfaRef.current = null;
         ttfbRef.current = null;
@@ -144,7 +197,7 @@ export function useSpeech(config: SpeechVoice) {
           try {
             await new Promise<void>((resolve, reject) => {
               const audio = getAudio();
-              audio.src = opts.src!;
+              audio.src = opts.src ?? "";
               audio.onended = () => resolve();
               audio.onerror = () => reject(new Error("missing"));
               audio.play().then(() => {
@@ -181,7 +234,11 @@ export function useSpeech(config: SpeechVoice) {
     [stop],
   );
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => () => {
+    stop();
+    void contextRef.current?.close();
+    contextRef.current = null;
+  }, [stop]);
 
   /** Voice changed mid-answer: drop queued audio and re-synthesize the unplayed clauses with the new voice. */
   const hotSwap = useCallback(() => {
