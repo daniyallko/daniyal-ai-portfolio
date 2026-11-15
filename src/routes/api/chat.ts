@@ -227,7 +227,7 @@ export const Route = createFileRoute("/api/chat")({
               const tLlm = Date.now();
               let firstToken: number | null = null;
               const s = await streamResponse(
-                { model: MODEL, instructions: SYSTEM, input, reasoning: { effort: "minimal" } },
+                { model: MODEL, instructions: SYSTEM, input, reasoning: { effort: "none" } },
                 { signal: request.signal },
               );
               let usage: unknown = null;
