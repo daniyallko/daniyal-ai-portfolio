@@ -171,7 +171,7 @@ async function answerQuestion(
     "(no relevant sources)";
   const stream = await streamResponse(
     {
-      model: config.backendModel,
+      model: liveSettings.backendModel,
       input: [
         ...messages,
         {
