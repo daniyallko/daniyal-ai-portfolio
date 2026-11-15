@@ -45,48 +45,65 @@ export const Route = createFileRoute("/api/chat")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { retrieve } = await import("@/server/rag.server");
 
-        const { data: thread } = await supabaseAdmin
-          .from("chat_threads")
-          .select("id, title, memory_summary, memory_message_count")
-          .eq("id", threadId)
-          .eq("visitor_id", visitorId)
-          .maybeSingle();
-        if (!thread) return Response.json({ error: "Thread not found" }, { status: 404 });
-
         const { enforceRateLimit } = await import("@/server/rate-limit.server");
-        const limited = await enforceRateLimit(request, [
-          { scope: "chat:ip:minute", limit: 20, windowSeconds: 60 },
-          { scope: "chat:ip:day", limit: 100, windowSeconds: 86_400 },
-          {
-            scope: "chat:visitor:day",
-            identity: visitorId,
-            limit: 100,
-            windowSeconds: 86_400,
-          },
+        // Independent reads run concurrently: one network round-trip instead of six.
+        const lookupStarted = performance.now();
+        const [threadRes, limited, historyRes, earlyCached] = await Promise.all([
+          supabaseAdmin
+            .from("chat_threads")
+            .select("id, title, memory_summary, memory_message_count")
+            .eq("id", threadId)
+            .eq("visitor_id", visitorId)
+            .maybeSingle(),
+          enforceRateLimit(request, [
+            { scope: "chat:ip:minute", limit: 20, windowSeconds: 60 },
+            { scope: "chat:ip:day", limit: 100, windowSeconds: 86_400 },
+            {
+              scope: "chat:visitor:day",
+              identity: visitorId,
+              limit: 100,
+              windowSeconds: 86_400,
+            },
+          ]),
+          supabaseAdmin
+            .from("chat_messages")
+            .select("role, content, debug", { count: "exact" })
+            .eq("thread_id", threadId)
+            .order("created_at", { ascending: false })
+            .limit(MEMORY_FETCH_LIMIT),
+          readCache(key).catch(() => null),
         ]);
+        const thread = threadRes.data;
+        if (!thread) return Response.json({ error: "Thread not found" }, { status: 404 });
         if (limited) return limited;
-
-        const {
-          data: historyRows,
-          count: historyCount,
-          error: hErr,
-        } = await supabaseAdmin
-          .from("chat_messages")
-          .select("role, content, debug", { count: "exact" })
-          .eq("thread_id", threadId)
-          .order("created_at", { ascending: false })
-          .limit(MEMORY_FETCH_LIMIT);
+        const { data: historyRows, count: historyCount, error: hErr } = historyRes;
         if (hErr) return Response.json({ error: hErr.message }, { status: 500 });
         const history = [...(historyRows ?? [])].reverse();
         const offTopic = looksOffTopic(message);
         const shareable = canShareAnswer(message, historyCount ?? 0) && !offTopic;
-        const lookupStarted = performance.now();
-        const cached = shareable ? await readCache(key).catch(() => null) : null;
+        const cached = shareable ? earlyCached : null;
         const cacheLookupMs = +(performance.now() - lookupStarted).toFixed(2);
+        if (shareable && !cached) {
+          // Self-heal: a cache miss on a public question means the knowledge base changed
+          // (or warm-up never ran); re-answer the curated questions in the background.
+          // Deduped per isolate by corpus version and skips entries already cached.
+          void import("@/server/answer-warm.server").then(async ({ warmAnswers }) => {
+            const { WARM_TIER1, WARM_TIER2 } = await import("@/lib/warm-questions");
+            await defer(request, warmAnswers([...WARM_TIER1, ...WARM_TIER2]));
+          });
+        }
 
-        const { error: insErr } = await supabaseAdmin
-          .from("chat_messages")
-          .insert({ thread_id: threadId, role: "user", content: message });
+        const [{ error: insErr }] = await Promise.all([
+          supabaseAdmin
+            .from("chat_messages")
+            .insert({ thread_id: threadId, role: "user", content: message }),
+          thread.title === "New chat"
+            ? supabaseAdmin
+                .from("chat_threads")
+                .update({ title: message.slice(0, 60) })
+                .eq("id", threadId)
+            : Promise.resolve(null),
+        ]);
         if (insErr) return Response.json({ error: insErr.message }, { status: 500 });
         const { notifyOwner, shortId } = await import("@/lib/telegram.server");
         const notified = notifyOwner([
@@ -95,12 +112,6 @@ export const Route = createFileRoute("/api/chat")({
           "",
           message,
         ]);
-        if (thread.title === "New chat") {
-          await supabaseAdmin
-            .from("chat_threads")
-            .update({ title: message.slice(0, 60) })
-            .eq("id", threadId);
-        }
 
         // Query reformulation: fold the previous user turn in for short follow-ups.
         const prevUser = [...history].reverse().find((m) => m.role === "user")?.content;
@@ -216,7 +227,7 @@ export const Route = createFileRoute("/api/chat")({
               const tLlm = Date.now();
               let firstToken: number | null = null;
               const s = await streamResponse(
-                { model: MODEL, instructions: SYSTEM, input, reasoning: { effort: "low" } },
+                { model: MODEL, instructions: SYSTEM, input, reasoning: { effort: "none" } },
                 { signal: request.signal },
               );
               let usage: unknown = null;

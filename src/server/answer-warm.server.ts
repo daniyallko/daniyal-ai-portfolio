@@ -27,7 +27,7 @@ async function answerOne(q: string): Promise<"generated" | "cached" | "skipped" 
       model: MODEL,
       instructions: SYSTEM,
       input: [{ role: "user", content }],
-      reasoning: { effort: "low" },
+      reasoning: { effort: "none" },
     });
     let text = "";
     for await (const ev of s as AsyncIterable<{ type: string; delta?: string }>)
