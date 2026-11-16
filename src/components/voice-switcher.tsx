@@ -119,17 +119,17 @@ export function VoiceSwitcher(props: {
         aria-label={`Voice and language: ${props.persona.name}, ${langLabel}`}
         className={`flex h-11 max-w-full items-center gap-2 rounded-full ${props.wide ? "w-full text-left sm:w-auto" : ""} border border-hairline bg-card/80 px-2.5 font-mono text-[10px] transition-colors hover:border-signal hover:text-signal sm:px-3`}
       >
-        <span className="grid h-7 min-w-7 shrink-0 place-items-center border border-signal/45 px-1 text-signal">
+        <span
+          className={`${props.wide ? "hidden sm:grid" : "grid"} h-7 min-w-7 shrink-0 place-items-center border border-signal/45 px-1 text-signal`}
+        >
           {props.persona.badge}
         </span>
         {props.wide ? (
           <>
-            <span className="flex min-w-0 flex-1 flex-col leading-tight sm:hidden">
-              <span className="truncate font-sans text-xs font-medium text-foreground">
-                {props.persona.name}
-              </span>
-              <span className="truncate font-sans text-[10px] text-muted-foreground">
-                Choose AI voice &amp; language
+            <span className="flex min-w-0 flex-1 items-center gap-1.5 sm:hidden">
+              <Languages className="h-3.5 w-3.5 shrink-0 text-signal" aria-hidden="true" />
+              <span className="truncate font-sans text-[11px] font-medium text-foreground">
+                Voice &amp; language
               </span>
             </span>
             <span className="hidden max-w-36 truncate font-sans text-xs font-medium text-foreground sm:inline lg:max-w-none">

@@ -270,7 +270,7 @@ export function HomeHero({
                   disabled={rec === "transcribing"}
                   aria-label={rec === "recording" ? "Stop dictation" : "Dictate a question"}
                   title="Dictate"
-                  className={`grid h-11 w-11 place-items-center rounded-xl transition-colors disabled:opacity-40 ${rec === "recording" ? "bg-destructive text-destructive-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
+                  className={`grid h-11 w-10 place-items-center rounded-xl transition-colors disabled:opacity-40 sm:w-11 ${rec === "recording" ? "bg-destructive text-destructive-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
                 >
                   {rec === "transcribing" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -284,7 +284,7 @@ export function HomeHero({
                   type="button"
                   onClick={() => go({ call: true })}
                   aria-label="Talk live with Daniyal's AI"
-                  className="relative flex h-11 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-px active:translate-y-px"
+                  className="relative flex h-11 items-center gap-1 rounded-xl bg-primary px-2.5 text-[13px] font-medium text-primary-foreground transition-transform hover:-translate-y-px active:translate-y-px sm:gap-1.5 sm:px-3 sm:text-sm"
                 >
                   <AudioLines className="h-4 w-4" />
                   <span className="whitespace-nowrap">Talk live</span>
@@ -293,7 +293,7 @@ export function HomeHero({
                   type="submit"
                   disabled={!input.trim()}
                   aria-label="Send question"
-                  className="grid h-11 w-11 place-items-center rounded-xl border border-hairline text-foreground transition-colors hover:border-primary disabled:opacity-40"
+                  className="grid h-11 w-10 place-items-center rounded-xl border border-hairline text-foreground transition-colors hover:border-primary disabled:opacity-40 sm:w-11"
                 >
                   <ArrowUp className="h-4 w-4" />
                 </button>
