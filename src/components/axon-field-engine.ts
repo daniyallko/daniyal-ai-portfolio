@@ -57,6 +57,9 @@ function seededRandom(seed: number): number {
   return value - Math.floor(value);
 }
 
+const AXON_CALM_MS = 4000;
+const AXON_SLEEP_MS = 9000;
+
 export function mountAxonField(
   host: HTMLElement,
   {
@@ -85,7 +88,53 @@ export function mountAxonField(
     for (const release of cleanup.splice(0).reverse()) release();
   };
 
-  try {
+  let syncAnimationRef: (() => void) | null = null;
+  const total = size * size;
+  const seedOrigins = new Float32Array(total * 4);
+  const seedRandom = new Float32Array(total * 3);
+  let cursor = 0;
+  let sliceTimer: ReturnType<typeof setTimeout> | 0 = 0;
+  cleanup.push(() => {
+    if (sliceTimer) clearTimeout(sliceTimer);
+  });
+  // Generate particle seeds in ~8ms slices so startup never creates a long main-thread task.
+  const slice = () => {
+    sliceTimer = 0;
+    if (disposed) return;
+    const deadline = performance.now() + 8;
+    while (cursor < total && performance.now() < deadline) {
+      const end = Math.min(total, cursor + 2048);
+      for (let index = cursor; index < end; index += 1) {
+        const point = axonOrigin(
+          seededRandom(index + 1) * Math.PI * 2,
+          seededRandom(index + 17011) * Math.PI * 2,
+        );
+        const offset = index * 4;
+        seedOrigins[offset] = point[0];
+        seedOrigins[offset + 1] = point[1];
+        seedOrigins[offset + 2] = point[2];
+        seedOrigins[offset + 3] = seededRandom(index + 34019);
+        seedRandom[index * 3] = seededRandom(index + 51001);
+        seedRandom[index * 3 + 1] = seededRandom(index + 68003);
+        seedRandom[index * 3 + 2] = seededRandom(index + 85007);
+      }
+      cursor = end;
+    }
+    if (cursor < total) {
+      sliceTimer = setTimeout(slice, 0);
+      return;
+    }
+    try {
+      setup();
+    } catch {
+      dispose();
+      onContextLoss();
+    }
+  };
+  slice();
+  return dispose;
+
+  function setup() {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(AXON_SCENE.fov, 1, AXON_SCENE.near, AXON_SCENE.far);
     camera.position.fromArray(AXON_SCENE.camera);
@@ -122,21 +171,8 @@ export function mountAxonField(
     const origins = originsTexture.image.data as Float32Array;
     const positions = positionsTexture.image.data as Float32Array;
 
-    for (let index = 0; index < size * size; index += 1) {
-      const u = seededRandom(index + 1) * Math.PI * 2;
-      const v = seededRandom(index + 17011) * Math.PI * 2;
-      const point = axonOrigin(u, v);
-      const offset = index * 4;
-      origins[offset] = point[0];
-      origins[offset + 1] = point[1];
-      origins[offset + 2] = point[2];
-      const seed = seededRandom(index + 34019);
-      origins[offset + 3] = seed;
-      positions[offset] = point[0];
-      positions[offset + 1] = point[1];
-      positions[offset + 2] = point[2];
-      positions[offset + 3] = seed;
-    }
+    origins.set(seedOrigins);
+    positions.set(seedOrigins);
 
     const positionVariable = gpuCompute.addVariable(
       "texturePosition",
@@ -161,13 +197,10 @@ export function mountAxonField(
     cleanup.push(() => geometry.dispose());
     const vertices = new Float32Array(size * size * 3);
     const references = new Float32Array(size * size * 2);
-    const random = new Float32Array(size * size * 3);
+    const random = seedRandom;
     for (let index = 0; index < size * size; index += 1) {
       references[index * 2] = ((index % size) + 0.5) / size;
       references[index * 2 + 1] = (Math.floor(index / size) + 0.5) / size;
-      random[index * 3] = seededRandom(index + 51001);
-      random[index * 3 + 1] = seededRandom(index + 68003);
-      random[index * 3 + 2] = seededRandom(index + 85007);
     }
     geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
     geometry.setAttribute("aReference", new THREE.BufferAttribute(references, 2));
@@ -218,7 +251,7 @@ export function mountAxonField(
     let announcedReady = false;
     let previousTime = 0;
     let elapsed = 0;
-    let lastInteraction = Number.NEGATIVE_INFINITY;
+    let lastInteraction = performance.now();
     let pointerActive = false;
     let pointerFrom = new THREE.Vector2();
     let pointerTo = new THREE.Vector2();
@@ -237,6 +270,8 @@ export function mountAxonField(
       const dark = isDark();
       particleUniforms.uDark.value = dark ? 1 : 0;
       material.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending;
+      lastInteraction = performance.now();
+      if (!frameId && typeof syncAnimationRef === "function") syncAnimationRef();
     };
     syncTheme();
     const themeObserver = new MutationObserver(syncTheme);
@@ -288,6 +323,7 @@ export function mountAxonField(
       pointerDelta = pointerTo.clone().sub(pointerFrom);
       pointerActive = true;
       lastInteraction = performance.now();
+      if (!frameId) syncAnimation();
       gazeTarget.set(pointerTo.x * 2 - 1, pointerTo.y * 2 - 1);
     };
     const onPointerMove = (event: PointerEvent) => {
@@ -319,6 +355,7 @@ export function mountAxonField(
       window.removeEventListener("touchcancel", onPointerLeave);
     });
 
+    syncAnimationRef = () => syncAnimation();
     const shouldAnimate = () =>
       !disposed &&
       ready &&
@@ -341,6 +378,18 @@ export function mountAxonField(
         frameId = requestAnimationFrame(frame);
         return;
       }
+      const idleFor = time - lastInteraction;
+      const settled = announcedReady && idleFor > AXON_SLEEP_MS && gaze.distanceTo(gazeTarget) < 0.002;
+      if (settled) {
+        // Quiescent sleep: fluid has dissipated and particles have recovered; wake on next pointer move.
+        previousTime = 0;
+        return;
+      }
+      const calm = announcedReady && idleFor > AXON_CALM_MS;
+      if (calm && previousTime && time - previousTime < 1000 / 30 - 1) {
+        frameId = requestAnimationFrame(frame);
+        return;
+      }
       const dt = previousTime ? Math.min((time - previousTime) / 1000, 1 / 30) : 1 / 60;
       previousTime = time;
       elapsed += dt;
@@ -349,7 +398,7 @@ export function mountAxonField(
         fluid.splat(pointerFrom, pointerTo, pointerDelta, axonSplatRadius(count));
         pointerDelta.set(0, 0);
       }
-      fluid.update(dt);
+      if (!calm) fluid.update(dt);
       positionUniforms.uFluidVelocity.value = fluid.velocity.read.texture;
       positionUniforms.uFluidDensity.value = fluid.density.read.texture;
       positionUniforms.uTime.value = elapsed;
@@ -403,10 +452,5 @@ export function mountAxonField(
     renderer.domElement.addEventListener("webglcontextlost", onContextLost);
     cleanup.push(() => renderer.domElement.removeEventListener("webglcontextlost", onContextLost));
     syncAnimation();
-
-    return dispose;
-  } catch (error) {
-    dispose();
-    throw error;
   }
 }
