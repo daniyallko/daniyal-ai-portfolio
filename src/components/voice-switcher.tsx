@@ -56,22 +56,30 @@ export function VoiceSwitcher(props: {
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; right: number; maxH: number } | null>(null);
+  const [pos, setPos] = useState<{
+    top?: number;
+    bottom?: number;
+    right: number;
+    maxH: number;
+  } | null>(null);
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
       const r = triggerRef.current?.getBoundingClientRect();
       if (!r) return;
       const vh = window.innerHeight;
-      const top = r.bottom + 8;
-      setPos({
-        top,
-        right: Math.min(
-          Math.max(16, window.innerWidth - r.right),
-          Math.max(16, window.innerWidth - Math.min(360, window.innerWidth - 32) - 16),
-        ),
-        maxH: Math.max(240, vh - top - 12),
-      });
+      const below = vh - r.bottom - 12;
+      const above = r.top - 12;
+      const right = Math.min(
+        Math.max(16, window.innerWidth - r.right),
+        Math.max(16, window.innerWidth - Math.min(360, window.innerWidth - 32) - 16),
+      );
+      // Open upward when the dock sits near the bottom edge so the panel never falls off-screen.
+      if (below < 280 && above > below) {
+        setPos({ bottom: vh - r.top + 8, right, maxH: Math.max(240, Math.min(560, above)) });
+      } else {
+        setPos({ top: r.bottom + 8, right, maxH: Math.max(240, Math.min(560, below)) });
+      }
     };
     place();
     window.addEventListener("resize", place);
@@ -154,7 +162,12 @@ export function VoiceSwitcher(props: {
       {open && pos && typeof document !== "undefined" && createPortal(
         <div
           ref={popRef}
-          style={{ top: pos.top, right: pos.right, maxHeight: Math.min(pos.maxH, 560) }}
+          style={{
+            top: pos.top,
+            bottom: pos.bottom,
+            right: pos.right,
+            maxHeight: Math.min(pos.maxH, 560),
+          }}
           id="voice-language-popover"
           role="dialog"
           aria-label="Voice and language"
