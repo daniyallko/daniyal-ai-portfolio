@@ -57,8 +57,6 @@ function seededRandom(seed: number): number {
   return value - Math.floor(value);
 }
 
-const AXON_CALM_MS = 1500;
-const AXON_SLEEP_MS = 2500;
 
 export function mountAxonField(
   host: HTMLElement,
@@ -378,18 +376,6 @@ export function mountAxonField(
         frameId = requestAnimationFrame(frame);
         return;
       }
-      const idleFor = time - lastInteraction;
-      const settled = announcedReady && idleFor > AXON_SLEEP_MS && gaze.distanceTo(gazeTarget) < 0.002;
-      if (settled) {
-        // Quiescent sleep: fluid has dissipated and particles have recovered; wake on next pointer move.
-        previousTime = 0;
-        return;
-      }
-      const calm = announcedReady && idleFor > AXON_CALM_MS;
-      if (calm && previousTime && time - previousTime < 1000 / 30 - 1) {
-        frameId = requestAnimationFrame(frame);
-        return;
-      }
       const dt = previousTime ? Math.min((time - previousTime) / 1000, 1 / 30) : 1 / 60;
       previousTime = time;
       elapsed += dt;
@@ -398,7 +384,7 @@ export function mountAxonField(
         fluid.splat(pointerFrom, pointerTo, pointerDelta, axonSplatRadius(count));
         pointerDelta.set(0, 0);
       }
-      if (!calm) fluid.update(dt);
+      fluid.update(dt);
       positionUniforms.uFluidVelocity.value = fluid.velocity.read.texture;
       positionUniforms.uFluidDensity.value = fluid.density.read.texture;
       positionUniforms.uTime.value = elapsed;
