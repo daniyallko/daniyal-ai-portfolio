@@ -125,7 +125,7 @@ export function VoiceSwitcher(props: {
               {props.persona.name}
             </span>
             <span className="truncate font-sans text-[10px] text-muted-foreground">
-              Tap to choose voice & language
+              Choose AI voice &amp; language
             </span>
           </span>
         ) : (
