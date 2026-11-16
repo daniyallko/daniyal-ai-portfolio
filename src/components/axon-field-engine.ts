@@ -133,6 +133,8 @@ export function mountAxonField(
   slice();
   return dispose;
 
+  let syncAnimationRef: (() => void) | null = null;
+
   function setup() {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(AXON_SCENE.fov, 1, AXON_SCENE.near, AXON_SCENE.far);
@@ -250,7 +252,7 @@ export function mountAxonField(
     let announcedReady = false;
     let previousTime = 0;
     let elapsed = 0;
-    let lastInteraction = Number.NEGATIVE_INFINITY;
+    let lastInteraction = performance.now();
     let pointerActive = false;
     let pointerFrom = new THREE.Vector2();
     let pointerTo = new THREE.Vector2();
@@ -269,6 +271,8 @@ export function mountAxonField(
       const dark = isDark();
       particleUniforms.uDark.value = dark ? 1 : 0;
       material.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending;
+      lastInteraction = performance.now();
+      if (!frameId && typeof syncAnimationRef === "function") syncAnimationRef();
     };
     syncTheme();
     const themeObserver = new MutationObserver(syncTheme);
@@ -352,6 +356,7 @@ export function mountAxonField(
       window.removeEventListener("touchcancel", onPointerLeave);
     });
 
+    syncAnimationRef = () => syncAnimation();
     const shouldAnimate = () =>
       !disposed &&
       ready &&
