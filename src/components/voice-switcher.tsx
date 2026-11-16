@@ -126,9 +126,8 @@ export function VoiceSwitcher(props: {
         </span>
         {props.wide ? (
           <>
-            <span className="flex min-w-0 flex-1 items-center gap-1.5 sm:hidden">
-              <Languages className="h-3.5 w-3.5 shrink-0 text-signal" aria-hidden="true" />
-              <span className="truncate font-sans text-[11px] font-medium text-foreground">
+            <span className="flex min-w-0 flex-1 items-center sm:hidden">
+              <span className="truncate font-sans text-[10px] font-medium text-foreground">
                 Voice &amp; language
               </span>
             </span>
@@ -148,7 +147,7 @@ export function VoiceSwitcher(props: {
           {langLabel}
         </span>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${props.wide ? "hidden sm:block" : ""} ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
         />
       </button>
