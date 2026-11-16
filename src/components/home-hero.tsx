@@ -242,7 +242,7 @@ export function HomeHero({
                 }`}
               />
             </div>
-            <div className="grid grid-cols-1 items-center gap-2 border-t border-hairline px-1 pt-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-hairline px-1 pt-2">
               <div className="min-w-0">
                 <VoiceSwitcher
                   wide
@@ -263,7 +263,7 @@ export function HomeHero({
                   }
                 />
               </div>
-              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 [&>button:nth-child(2)]:flex-1 [&>button:nth-child(2)]:justify-center sm:[&>button:nth-child(2)]:flex-none">
+              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
                 <button
                   type="button"
                   onClick={toggleDictation}

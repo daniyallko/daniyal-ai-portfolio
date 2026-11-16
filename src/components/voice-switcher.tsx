@@ -49,7 +49,7 @@ export function VoiceSwitcher(props: {
   previewing: string | null;
   previewState: "idle" | "loading" | "playing";
   onPreview: (p: VoicePersona) => void;
-  /** Fill the available width and show a descriptive label (homepage dock). */
+  /** Fill the available width on phones only; compact pill from sm up (homepage dock). */
   wide?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -105,7 +105,10 @@ export function VoiceSwitcher(props: {
     ? `Locked: ${LANGUAGES[props.lock].name}`
     : `Auto: ${props.detected?.name ?? "detecting"}`;
   return (
-    <div ref={ref} className={props.wide ? "relative w-full" : "relative ml-auto"}>
+    <div
+      ref={ref}
+      className={props.wide ? "relative w-full sm:ml-auto sm:w-auto" : "relative ml-auto"}
+    >
       <button
         ref={triggerRef}
         type="button"
@@ -114,27 +117,32 @@ export function VoiceSwitcher(props: {
         aria-haspopup="dialog"
         aria-controls="voice-language-popover"
         aria-label={`Voice and language: ${props.persona.name}, ${langLabel}`}
-        className={`flex h-11 max-w-full items-center gap-2 rounded-full ${props.wide ? "w-full text-left" : ""} border border-hairline bg-card/80 px-2.5 font-mono text-[10px] transition-colors hover:border-signal hover:text-signal sm:px-3`}
+        className={`flex h-11 max-w-full items-center gap-2 rounded-full ${props.wide ? "w-full text-left sm:w-auto" : ""} border border-hairline bg-card/80 px-2.5 font-mono text-[10px] transition-colors hover:border-signal hover:text-signal sm:px-3`}
       >
         <span className="grid h-7 min-w-7 shrink-0 place-items-center border border-signal/45 px-1 text-signal">
           {props.persona.badge}
         </span>
         {props.wide ? (
-          <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate font-sans text-xs font-medium text-foreground">
+          <>
+            <span className="flex min-w-0 flex-1 flex-col leading-tight sm:hidden">
+              <span className="truncate font-sans text-xs font-medium text-foreground">
+                {props.persona.name}
+              </span>
+              <span className="truncate font-sans text-[10px] text-muted-foreground">
+                Choose AI voice &amp; language
+              </span>
+            </span>
+            <span className="hidden max-w-36 truncate font-sans text-xs font-medium text-foreground sm:inline lg:max-w-none">
               {props.persona.name}
             </span>
-            <span className="truncate font-sans text-[10px] text-muted-foreground">
-              Choose AI voice &amp; language
-            </span>
-          </span>
+          </>
         ) : (
           <span className="hidden max-w-36 truncate font-sans text-xs font-medium text-foreground min-[420px]:inline lg:max-w-none">
             {props.persona.name}
           </span>
         )}
         <span
-          className={`hidden max-w-32 truncate text-muted-foreground ${props.wide ? "lg:inline" : "md:inline"}`}
+          className="hidden max-w-32 truncate text-muted-foreground md:inline"
           aria-live="polite"
         >
           {langLabel}
