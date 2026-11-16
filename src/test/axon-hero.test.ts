@@ -133,7 +133,7 @@ afterEach(() => {
 });
 
 describe("AxonHero lifecycle", () => {
-  it("activates automatically after the idle prefetch without pointer intent", async () => {
+  it("idle prefetch only loads the engine and waits for pointer intent before mounting", async () => {
     let idle: IdleRequestCallback | undefined;
     const requestIdle = vi.fn((callback: IdleRequestCallback) => {
       idle = callback;
@@ -150,8 +150,9 @@ describe("AxonHero lifecycle", () => {
       idle?.({ didTimeout: false, timeRemaining: () => 50 });
       await Promise.resolve();
     });
-    await waitFor(() => expect(mountMock).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-enhanced", "true");
+    await act(async () => new Promise((r) => setTimeout(r, 50)));
+    expect(mountMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("axon-hero")).toHaveAttribute("data-enhanced", "false");
   });
 
   it("mounts immediately on touch intent inside the hero", async () => {
