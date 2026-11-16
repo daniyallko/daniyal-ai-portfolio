@@ -88,6 +88,7 @@ export function mountAxonField(
     for (const release of cleanup.splice(0).reverse()) release();
   };
 
+  let syncAnimationRef: (() => void) | null = null;
   const total = size * size;
   const seedOrigins = new Float32Array(total * 4);
   const seedRandom = new Float32Array(total * 3);
@@ -132,8 +133,6 @@ export function mountAxonField(
   };
   slice();
   return dispose;
-
-  let syncAnimationRef: (() => void) | null = null;
 
   function setup() {
     const scene = new THREE.Scene();
