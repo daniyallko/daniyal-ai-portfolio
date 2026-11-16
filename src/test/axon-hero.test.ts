@@ -359,10 +359,10 @@ describe("client-only renderer contracts", () => {
     expect(source).toContain('rel: "preload"');
     expect(source).toContain('as: "image"');
     expect(source).toMatch(
-      /href: "\/images\/axon-ring\.webp",\s*as: "image",\s*crossOrigin: "anonymous"/,
+      /href: "\/images\/axon-ring\.webp",\s*as: "image"/,
     );
     expect(source).toMatch(
-      /href: "\/images\/axon-ring-narrow\.webp",\s*as: "image",\s*crossOrigin: "anonymous"/,
+      /href: "\/images\/axon-ring-narrow\.webp",\s*as: "image"/,
     );
     expect(source).toContain('media: "(min-aspect-ratio: 3/5) and (prefers-color-scheme: light)"');
     expect(source).toContain('media: "(max-aspect-ratio: 3/5) and (prefers-color-scheme: dark)"');

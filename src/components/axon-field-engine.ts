@@ -57,8 +57,8 @@ function seededRandom(seed: number): number {
   return value - Math.floor(value);
 }
 
-const AXON_CALM_MS = 4000;
-const AXON_SLEEP_MS = 9000;
+const AXON_CALM_MS = 1500;
+const AXON_SLEEP_MS = 2500;
 
 export function mountAxonField(
   host: HTMLElement,

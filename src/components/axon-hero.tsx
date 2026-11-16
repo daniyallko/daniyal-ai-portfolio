@@ -96,9 +96,8 @@ function LiveRing({ paused }: { paused: boolean }): ReactElement {
       prefetchStarted = true;
       const prefetch = () => {
         cancelPrefetch = null;
-        if (!disposed && !blocked && eligibleCount > 0 && activeCount === 0) {
-          void start(eligibleCount);
-        }
+        // Only download the engine module while idle; WebGL starts on first pointer/touch intent.
+        if (!disposed && !blocked) void loadEngine().catch(() => {});
       };
       if (typeof window.requestIdleCallback === "function") {
         const handle = window.requestIdleCallback(prefetch, { timeout: 2000 });
