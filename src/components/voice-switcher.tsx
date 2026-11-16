@@ -49,29 +49,37 @@ export function VoiceSwitcher(props: {
   previewing: string | null;
   previewState: "idle" | "loading" | "playing";
   onPreview: (p: VoicePersona) => void;
-  /** Fill the available width and show a descriptive label (homepage dock). */
+  /** Fill the available width on phones only; compact pill from sm up (homepage dock). */
   wide?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; right: number; maxH: number } | null>(null);
+  const [pos, setPos] = useState<{
+    top?: number;
+    bottom?: number;
+    right: number;
+    maxH: number;
+  } | null>(null);
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
       const r = triggerRef.current?.getBoundingClientRect();
       if (!r) return;
       const vh = window.innerHeight;
-      const top = r.bottom + 8;
-      setPos({
-        top,
-        right: Math.min(
-          Math.max(16, window.innerWidth - r.right),
-          Math.max(16, window.innerWidth - Math.min(360, window.innerWidth - 32) - 16),
-        ),
-        maxH: Math.max(240, vh - top - 12),
-      });
+      const below = vh - r.bottom - 12;
+      const above = r.top - 12;
+      const right = Math.min(
+        Math.max(16, window.innerWidth - r.right),
+        Math.max(16, window.innerWidth - Math.min(360, window.innerWidth - 32) - 16),
+      );
+      // Open upward when the dock sits near the bottom edge so the panel never falls off-screen.
+      if (below < 280 && above > below) {
+        setPos({ bottom: vh - r.top + 8, right, maxH: Math.max(240, Math.min(560, above)) });
+      } else {
+        setPos({ top: r.bottom + 8, right, maxH: Math.max(240, Math.min(560, below)) });
+      }
     };
     place();
     window.addEventListener("resize", place);
@@ -105,7 +113,10 @@ export function VoiceSwitcher(props: {
     ? `Locked: ${LANGUAGES[props.lock].name}`
     : `Auto: ${props.detected?.name ?? "detecting"}`;
   return (
-    <div ref={ref} className={props.wide ? "relative w-full" : "relative ml-auto"}>
+    <div
+      ref={ref}
+      className={props.wide ? "relative w-full sm:ml-auto sm:w-auto" : "relative ml-auto"}
+    >
       <button
         ref={triggerRef}
         type="button"
@@ -114,40 +125,49 @@ export function VoiceSwitcher(props: {
         aria-haspopup="dialog"
         aria-controls="voice-language-popover"
         aria-label={`Voice and language: ${props.persona.name}, ${langLabel}`}
-        className={`flex h-11 max-w-full items-center gap-2 rounded-full ${props.wide ? "w-full text-left" : ""} border border-hairline bg-card/80 px-2.5 font-mono text-[10px] transition-colors hover:border-signal hover:text-signal sm:px-3`}
+        className={`flex h-11 max-w-full items-center gap-2 rounded-full ${props.wide ? "w-full text-left sm:w-auto" : ""} border border-hairline bg-card/80 px-2.5 font-mono text-[10px] transition-colors hover:border-signal hover:text-signal sm:px-3`}
       >
-        <span className="grid h-7 min-w-7 shrink-0 place-items-center border border-signal/45 px-1 text-signal">
+        <span
+          className={`${props.wide ? "hidden sm:grid" : "grid"} h-7 min-w-7 shrink-0 place-items-center border border-signal/45 px-1 text-signal`}
+        >
           {props.persona.badge}
         </span>
         {props.wide ? (
-          <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="truncate font-sans text-xs font-medium text-foreground">
+          <>
+            <span className="flex min-w-0 flex-1 items-center sm:hidden">
+              <span className="truncate font-sans text-[10px] font-medium text-foreground">
+                Voice &amp; language
+              </span>
+            </span>
+            <span className="hidden max-w-36 truncate font-sans text-xs font-medium text-foreground sm:inline lg:max-w-none">
               {props.persona.name}
             </span>
-            <span className="truncate font-sans text-[10px] text-muted-foreground">
-              Choose AI voice &amp; language
-            </span>
-          </span>
+          </>
         ) : (
           <span className="hidden max-w-36 truncate font-sans text-xs font-medium text-foreground min-[420px]:inline lg:max-w-none">
             {props.persona.name}
           </span>
         )}
         <span
-          className={`hidden max-w-32 truncate text-muted-foreground ${props.wide ? "lg:inline" : "md:inline"}`}
+          className="hidden max-w-32 truncate text-muted-foreground md:inline"
           aria-live="polite"
         >
           {langLabel}
         </span>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${props.wide ? "hidden sm:block" : ""} ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
         />
       </button>
       {open && pos && typeof document !== "undefined" && createPortal(
         <div
           ref={popRef}
-          style={{ top: pos.top, right: pos.right, maxHeight: Math.min(pos.maxH, 560) }}
+          style={{
+            top: pos.top,
+            bottom: pos.bottom,
+            right: pos.right,
+            maxHeight: Math.min(pos.maxH, 560),
+          }}
           id="voice-language-popover"
           role="dialog"
           aria-label="Voice and language"
