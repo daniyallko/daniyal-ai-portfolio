@@ -142,7 +142,7 @@ describe("AXON renderer lifecycle", () => {
       /if \(shaderFailed\)[\s\S]*?dispose\(\);[\s\S]*?onContextLoss\(\);[\s\S]*?return;/,
     );
     expect(engine).toMatch(/if \(!announcedReady && !shaderFailed\)/);
-    expect(engine).toMatch(/catch \(error\) \{\s*dispose\(\);\s*throw error;/);
+    expect(engine).toMatch(/catch \{\s*dispose\(\);\s*onContextLoss\(\);/);
   });
 
   it("announces readiness only after rendering and disposes every GPU owner", () => {
