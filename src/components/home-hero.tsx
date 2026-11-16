@@ -235,16 +235,17 @@ export function HomeHero({
                       ? "Transcribing…"
                       : PROMPTS[promptIndex]
                 }
-                className={`block max-h-40 w-full resize-none bg-transparent px-3 py-3.5 text-base outline-none ${
+                className={`block max-h-40 w-full resize-none bg-transparent px-3 py-3.5 text-base outline-none ${input ? "overflow-y-auto" : "overflow-hidden [scrollbar-width:none]"} ${
                   rec === "idle" && !input
                     ? "placeholder:text-transparent"
                     : "placeholder:text-muted-foreground"
                 }`}
               />
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-hairline px-1 pt-2">
-              <div className="min-w-0 [&>div]:!ml-0">
+            <div className="grid grid-cols-1 items-center gap-2 border-t border-hairline px-1 pt-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="min-w-0">
                 <VoiceSwitcher
+                  wide
                   persona={prefs.persona}
                   onPersona={prefs.setPersonaId}
                   lock={prefs.lock}
@@ -262,7 +263,7 @@ export function HomeHero({
                   }
                 />
               </div>
-              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 [&>button:nth-child(2)]:flex-1 [&>button:nth-child(2)]:justify-center sm:[&>button:nth-child(2)]:flex-none">
                 <button
                   type="button"
                   onClick={toggleDictation}
@@ -283,10 +284,10 @@ export function HomeHero({
                   type="button"
                   onClick={() => go({ call: true })}
                   aria-label="Talk live with Daniyal's AI"
-                  className="relative flex h-11 items-center gap-2 rounded-xl bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-px active:translate-y-px"
+                  className="relative flex h-11 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-px active:translate-y-px"
                 >
                   <AudioLines className="h-4 w-4" />
-                  <span className="hidden sm:inline">Talk live</span>
+                  <span className="whitespace-nowrap">Talk live</span>
                 </button>
                 <button
                   type="submit"
