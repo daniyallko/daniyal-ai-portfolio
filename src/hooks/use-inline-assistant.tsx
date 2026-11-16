@@ -68,16 +68,24 @@ export function useInlineAssistant(): {
       void fetch("/voice-worklets.js").catch(() => {});
       void initialize().catch(() => {});
     };
-    const w = window as Window & {
-      requestIdleCallback?: (callback: () => void) => number;
-      cancelIdleCallback?: (id: number) => void;
+    // Defer the heavy preload until the visitor shows intent or the page has been calm for 5s,
+    // so it never competes with first paint and hero startup.
+    let done = false;
+    const events = ["pointerdown", "keydown", "focusin", "touchstart", "scroll"] as const;
+    const run = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      for (const name of events) window.removeEventListener(name, run);
+      boot();
     };
-    if (w.requestIdleCallback) {
-      const id = w.requestIdleCallback(boot);
-      return () => w.cancelIdleCallback?.(id);
-    }
-    const id = setTimeout(boot, 200);
-    return () => clearTimeout(id);
+    for (const name of events) window.addEventListener(name, run, { passive: true, once: true });
+    const timer = setTimeout(run, 5000);
+    return () => {
+      done = true;
+      clearTimeout(timer);
+      for (const name of events) window.removeEventListener(name, run);
+    };
   }, []);
 
   const flush = useCallback(() => {
