@@ -89,7 +89,7 @@ export function AdminKb() {
           : "Add + reindex";
 
   return (
-    <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
+    <div className="grid min-h-0 flex-1 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_420px] xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_480px]">
       <section
         className="min-h-0 border-b border-hairline xl:overflow-y-auto xl:border-b-0 xl:border-r"
         aria-label="Knowledge base sources"
@@ -325,7 +325,7 @@ export function AdminKb() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0">
           <div className="mb-2 flex items-center justify-between gap-3">
             <label htmlFor="kb-content" className="font-mono text-[11px] text-muted-foreground">
               Source content
@@ -340,14 +340,14 @@ export function AdminKb() {
             onChange={(e) => setDraft({ ...draft, content: e.target.value })}
             placeholder="Paste text, or upload a PDF above"
             disabled={!!busy}
-            className="min-h-[280px] w-full flex-1 resize-y border border-hairline bg-background p-3 font-sans text-base leading-7 outline-none transition-colors placeholder:text-muted-foreground focus:border-ring disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm xl:min-h-[320px]"
+            className="min-h-[280px] w-full resize-y border border-hairline bg-background p-3 font-sans text-base leading-7 outline-none transition-colors placeholder:text-muted-foreground focus:border-ring disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm xl:min-h-[320px]"
           />
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Minimum 20 characters. Blank lines are preserved.
           </p>
         </div>
 
-        <div className="flex flex-col-reverse gap-2 min-[400px]:flex-row">
+        <div className="flex shrink-0 flex-col-reverse gap-2 min-[400px]:flex-row">
           <button
             type="button"
             disabled={!!busy || !draft.title.trim() || draft.content.trim().length < 20}
