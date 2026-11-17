@@ -140,7 +140,7 @@ export const adminListKb = createServerFn({ method: "POST" })
       docs.flatMap((d) => chunkDocument(d)),
       true,
     );
-    return { docs: docs.map((d) => ({ ...d, chunks: chunkDocument(d).length })), base: [] };
+    return { docs: docs.map((d) => ({ ...d, chunks: chunkDocument(d).length })), base: [] as Array<{ id: string; section: string; title: string; text: string }> };
   });
 
 export const adminSaveKbDoc = createServerFn({ method: "POST" })
