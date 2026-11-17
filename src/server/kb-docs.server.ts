@@ -8,10 +8,13 @@ export function syncDocuments(force = false): Promise<void> {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("kb_documents")
-      .select("id, title, section, content")
+      .select("id, title, section, content, builtin_key")
       .order("created_at");
     if (error) throw new Error(error.message);
-    setExtraChunks((data ?? []).flatMap((d) => chunkDocument(d)));
+    setExtraChunks(
+      (data ?? []).flatMap((d) => chunkDocument(d)),
+      (data ?? []).some((d) => d.builtin_key),
+    );
   })();
   loaded = { until: Date.now() + 60_000, value };
   value.catch((e) => {

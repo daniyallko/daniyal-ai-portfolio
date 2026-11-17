@@ -129,6 +129,7 @@ export type Database = {
       }
       kb_documents: {
         Row: {
+          builtin_key: string | null
           content: string
           created_at: string
           id: string
@@ -138,6 +139,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          builtin_key?: string | null
           content: string
           created_at?: string
           id?: string
@@ -147,6 +149,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          builtin_key?: string | null
           content?: string
           created_at?: string
           id?: string

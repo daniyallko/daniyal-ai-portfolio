@@ -208,13 +208,16 @@ export type Chunk = { id: string; section: string; title: string; text: string }
 
 // Admin-added documents (loaded server-side from kb_documents) join the corpus here.
 let extraChunks: Chunk[] = [];
-export function setExtraChunks(chunks: Chunk[]) {
+let builtinsOverridden = false;
+/** `overridesBuiltins`: the built-in chunks were imported into kb_documents, so the static copies are skipped. */
+export function setExtraChunks(chunks: Chunk[], overridesBuiltins = false) {
   extraChunks = chunks;
+  builtinsOverridden = overridesBuiltins;
 }
 
 /** Split an admin document into paragraph-aligned chunks with bounded overlap. */
 export function chunkDocument(
-  doc: { id: string; title: string; section: string; content: string },
+  doc: { id: string; title: string; section: string; content: string; builtin_key?: string | null },
   max = 900,
 ): Chunk[] {
   const overlap = Math.min(120, Math.floor(max / 5));
@@ -242,7 +245,12 @@ export function chunkDocument(
     const prefix = tail.includes(" ") ? tail.slice(tail.indexOf(" ") + 1) : tail;
     const text = prefix ? `${prefix} ${body}` : body;
     return {
-      id: `doc-${doc.id.slice(0, 8)}-${i}`,
+      // Imported built-ins keep their original chunk ids so evals and citations stay stable.
+      id: doc.builtin_key
+        ? i === 0
+          ? doc.builtin_key
+          : `${doc.builtin_key}-${i}`
+        : `doc-${doc.id.slice(0, 8)}-${i}`,
       section: doc.section,
       title: out.length > 1 ? `${doc.title} (${i + 1}/${out.length})` : doc.title,
       text,
@@ -251,6 +259,12 @@ export function chunkDocument(
 }
 
 export function buildChunks(): Chunk[] {
+  if (builtinsOverridden) return [...extraChunks];
+  return [...builtinChunks(), ...extraChunks];
+}
+
+/** The static portfolio chunks derived from this file. */
+export function builtinChunks(): Chunk[] {
   const chunks: Chunk[] = [
     {
       id: "profile",
@@ -297,5 +311,5 @@ export function buildChunks(): Chunk[] {
       text: `${s.group} skills: ${s.items.join(", ")}.`,
     });
   }
-  return [...chunks, ...extraChunks];
+  return chunks;
 }

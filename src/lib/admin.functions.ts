@@ -117,16 +117,30 @@ export const adminListKb = createServerFn({ method: "POST" })
       .select("*")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    const { buildChunks, chunkDocument, setExtraChunks } = await import("@/lib/portfolio");
-    setExtraChunks([]);
-    const base = buildChunks().map((c) => ({
-      id: c.id,
-      section: c.section,
-      title: c.title,
-      text: c.text,
-    }));
-    setExtraChunks((data ?? []).flatMap((d) => chunkDocument(d)));
-    return { docs: (data ?? []).map((d) => ({ ...d, chunks: chunkDocument(d).length })), base };
+    const { builtinChunks, chunkDocument, setExtraChunks } = await import("@/lib/portfolio");
+    let docs = data ?? [];
+    // One-time import: built-in portfolio chunks become normal, editable sources.
+    if (!docs.some((d) => d.builtin_key)) {
+      const rows = builtinChunks().map((c) => ({
+        title: c.title,
+        section: c.section,
+        content: c.text,
+        source_type: "text",
+        builtin_key: c.id,
+      }));
+      const { data: inserted, error: insErr } = await context.supabase
+        .from("kb_documents")
+        .upsert(rows, { onConflict: "builtin_key", ignoreDuplicates: true })
+        .select("*");
+      if (insErr) throw new Error(insErr.message);
+      docs = [...docs, ...(inserted ?? [])];
+      await reindex();
+    }
+    setExtraChunks(
+      docs.flatMap((d) => chunkDocument(d)),
+      true,
+    );
+    return { docs: docs.map((d) => ({ ...d, chunks: chunkDocument(d).length })), base: [] };
   });
 
 export const adminSaveKbDoc = createServerFn({ method: "POST" })

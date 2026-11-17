@@ -153,7 +153,7 @@ export function AdminKb() {
                         className="mt-1 font-mono text-[10px] leading-5 text-muted-foreground"
                         style={{ overflowWrap: "anywhere" }}
                       >
-                        {d.section} · {d.source_type} · {d.chunks} chunks ·{" "}
+                        {d.section} · {d.builtin_key ? "built-in" : d.source_type} · {d.chunks} chunks ·{" "}
                         {d.content.length.toLocaleString()} chars
                       </p>
                     </div>
@@ -202,6 +202,7 @@ export function AdminKb() {
                   </p>
                 </div>
               )}
+              {(kb.data?.base.length ?? 0) > 0 && (
               <details className="group mt-6 border border-hairline bg-card">
                 <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                   <span>
@@ -235,6 +236,7 @@ export function AdminKb() {
                   ))}
                 </div>
               </details>
+              )}
             </>
           )}
         </div>

@@ -32,3 +32,15 @@ describe("admin documents", () => {
     setExtraChunks([]);
   });
 });
+
+import { builtinChunks as _bc, buildChunks as _b, chunkDocument as _cd, setExtraChunks as _set } from "./portfolio";
+describe("imported built-in chunks", () => {
+  it("replace the static copies and keep their ids", () => {
+    const doc = { id: "11111111-aaaa", title: "Edited", section: "Profile", content: "New text", builtin_key: "profile" };
+    _set(_cd(doc), true);
+    const ids = _b().map((c) => c.id);
+    expect(ids).toEqual(["profile"]);
+    _set([]);
+    expect(_b().length).toBe(_bc().length);
+  });
+});
