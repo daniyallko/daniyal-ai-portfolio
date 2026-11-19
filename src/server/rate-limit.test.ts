@@ -7,7 +7,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 }));
 
 const request = () =>
-  new Request("https://daniyal.online/api/chat", {
+  new Request("https://daniyal.pro/api/chat", {
     headers: { "cf-connecting-ip": "203.0.113.10" },
   });
 const policy = { scope: "chat:ip", limit: 20, windowSeconds: 60 };

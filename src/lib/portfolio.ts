@@ -10,7 +10,7 @@ export const profile = {
   languages: "English, Hindi and Urdu; reads Arabic",
   email: "daniyallko@gmail.com",
   phone: "+91 7007644677",
-  website: "https://daniyal.online",
+  website: "https://daniyal.pro",
   linkedin: "https://www.linkedin.com/in/mohd-daniyal-ai/",
   github: "https://github.com/daniyallko",
   summary:

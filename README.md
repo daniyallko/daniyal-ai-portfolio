@@ -1,10 +1,10 @@
 <div align="center">
 
-# Daniyal.online — Voice AI & Hybrid RAG Portfolio
+# Daniyal.pro — Voice AI & Hybrid RAG Portfolio
 
 **An interactive portfolio for Mohd Daniyal, Full Stack AI Engineer. Recruiters can ask questions by text or live voice and get cited answers.**
 
-[![Live](https://img.shields.io/badge/live-daniyal.online-E5A93C?style=for-the-badge)](https://daniyal.online)
+[![Live](https://img.shields.io/badge/live-daniyal.pro-E5A93C?style=for-the-badge)](https://daniyal.pro)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![React 19](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TanStack Start](https://img.shields.io/badge/TanStack_Start-FF4154?style=for-the-badge)
@@ -257,6 +257,6 @@ Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env`, plus serv
 <div align="center">
 
 **Mohd Daniyal** · Full Stack AI Engineer
-[daniyal.online](https://daniyal.online) · [daniyallko@gmail.com](mailto:daniyallko@gmail.com)
+[daniyal.pro](https://daniyal.pro) · [daniyallko@gmail.com](mailto:daniyallko@gmail.com)
 
 </div>
