@@ -62,3 +62,22 @@ export function warmAnswers(questions: string[], concurrency = 4): Promise<WarmR
   running.set(id, job);
   return job;
 }
+
+const audioRuns = ((globalThis as { __audioWarm?: Map<string, Promise<unknown>> }).__audioWarm ??= new Map());
+/** Pre-records read-aloud audio for the cached answers to these questions; deduped per corpus version. */
+export function prerecordAnswerAudio(questions: string[]): Promise<unknown> {
+  const id = `${corpusVersion()}:${fingerprint(questions.join("|"))}`;
+  const existing = audioRuns.get(id);
+  if (existing) return existing;
+  const job = (async () => {
+    const key = (q: string) => answerKey(q, fingerprint(MODEL + SYSTEM));
+    const hits = await Promise.all(questions.map((q) => readCache(key(q)).catch(() => null)));
+    const texts = hits.flatMap((h) => (h ? [h.entry.text] : []));
+    const { prerenderAnswers } = await import("./tts.server");
+    const report = await prerenderAnswers(texts);
+    if (report.failed) audioRuns.delete(id);
+    return report;
+  })();
+  audioRuns.set(id, job);
+  return job;
+}

@@ -102,9 +102,11 @@ async function reindex() {
   await warmCorpus(true);
   const { buildChunks } = await import("@/lib/portfolio");
   // Re-answer the recruiter questions for the new content so first visitors get instant replies.
-  const { warmAnswers } = await import("@/server/answer-warm.server");
+  const { warmAnswers, prerecordAnswerAudio } = await import("@/server/answer-warm.server");
   const { WARM_TIER1, WARM_TIER2 } = await import("@/lib/warm-questions");
   const answers = await warmAnswers([...WARM_TIER1, ...WARM_TIER2], 6);
+  // Re-record spoken audio for the top questions so Listen is instant for the new answers.
+  void prerecordAnswerAudio(WARM_TIER1).catch((e) => console.error("audio prerecord failed", e));
   return { chunks: buildChunks().length, ms: Date.now() - t0, answers };
 }
 

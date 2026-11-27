@@ -13,10 +13,12 @@ export const Route = createFileRoute("/api/public/rag-warm")({
           if (corpus.status === "rejected" && popular.status === "rejected") throw corpus.reason;
           if (corpus.status === "fulfilled") {
             // Pre-answer recruiter questions in the background; no-op once cached for this corpus version.
-            const { warmAnswers } = await import("@/server/answer-warm.server");
+            const { warmAnswers, prerecordAnswerAudio } = await import("@/server/answer-warm.server");
             const { WARM_TIER1, WARM_TIER2 } = await import("@/lib/warm-questions");
             const { defer } = await import("@/lib/background.server");
-            await defer(request, warmAnswers(WARM_TIER1).then(() => warmAnswers(WARM_TIER2)));
+            await defer(request, warmAnswers(WARM_TIER1)
+                .then(() => prerecordAnswerAudio(WARM_TIER1))
+                .then(() => warmAnswers(WARM_TIER2)));
           }
           const chunksLoaded = corpus.status === "fulfilled" ? corpus.value : 0;
           const entries = popular.status === "fulfilled" ? popular.value : [];

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { generateSpeech, GatewayError } from "@lovable.dev/ai-gateway";
-import { prepareForSpeech, SPEAK_MODEL } from "@/lib/speech";
+import { GatewayError } from "@lovable.dev/ai-gateway";
+import { prepareForSpeech } from "@/lib/speech";
 import { VOICE_PERSONAS, getPersona } from "@/config/voicePersonas";
 import { LANGUAGES, detectLanguage, isLangCode } from "@/lib/language";
 
@@ -52,31 +52,28 @@ export const Route = createFileRoute("/api/speak")({
         }
 
         try {
+          const store = await import("@/server/tts.server");
+          const stored = await store.loadStoredAudio(key);
+          if (stored) {
+            remember(key, stored);
+            return new Response(stored, {
+              headers: { "content-type": "audio/wav", "cache-control": "no-store", "x-voice": voiceName, "x-lang": lang, "x-tts-cache": "stored" },
+            });
+          }
           const { enforceRateLimit } = await import("@/server/rate-limit.server");
           const limited = await enforceRateLimit(request, [
             { scope: "speak:ip:minute", limit: 30, windowSeconds: 60 },
             { scope: "speak:ip:day", limit: 200, windowSeconds: 86_400 },
           ]);
           if (limited) return limited;
-          const res = await generateSpeech(
-            {
-              model: SPEAK_MODEL,
-              contents: [{ role: "user", parts: [{ text }] }],
-              generationConfig: {
-                responseModalities: ["AUDIO"],
-                speechConfig: {
-                  voiceConfig: { prebuiltVoiceConfig: { voiceName } },
-                  languageCode: LANGUAGES[lang].bcp47,
-                },
-              },
-            },
-            { signal: request.signal },
-          );
-          const audio = await res.blob().then((b) => b.arrayBuffer());
+          const { audio, contentType } = await store.synthesize(text, voiceName, lang, request.signal);
           remember(key, audio);
+          // Keep every synthesized clause so the next listener gets it instantly.
+          const { defer } = await import("@/lib/background.server");
+          await defer(request, store.storeAudio(key, audio));
           return new Response(audio, {
             headers: {
-              "content-type": res.contentType || "audio/wav",
+              "content-type": contentType || "audio/wav",
               "cache-control": "no-store",
               "x-voice": voiceName,
               "x-lang": lang,
