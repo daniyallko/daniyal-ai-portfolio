@@ -39,7 +39,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { detectLanguage, previewLine, type DetectedLanguage } from "@/lib/language";
 import { browserCache, rememberBrowser } from "@/lib/rag-browser";
 import { cacheTierLabel, type TextStream } from "@/components/voice-diagnostics";
-import { answerKey, fingerprint, retrievalKey, type CacheEntry } from "@/lib/rag-cache";
+import { answerKey, canShareAnswer, fingerprint, retrievalKey, type CacheEntry } from "@/lib/rag-cache";
 import { CHAT_MODEL, CHAT_SYSTEM } from "@/lib/prompt";
 
 const SUGGESTIONS = [
@@ -349,6 +349,17 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
       const local = browserCache(
         answerKey(message, fingerprint(CHAT_MODEL + CHAT_SYSTEM), prefs.lock ?? undefined),
       );
+      // Saved answer on this device: show it now; the server call still records the chat.
+      const instant =
+        local && canShareAnswer(message, messages.length) ? local : null;
+      if (instant) {
+        firstAt = performance.now();
+        setMessages((m) => [
+          ...m,
+          { id: aid, role: "assistant", content: instant.text, sources: instant.sources as never },
+        ]);
+        setStatus("streaming");
+      }
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -356,6 +367,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
           threadId,
           visitorId,
           message,
+          firstTurn: messages.length === 0,
           ...(local ? { cachedKey: local.key } : {}),
           ...(prefs.lock ? { lang: prefs.lock } : {}),
         }),
@@ -365,7 +377,7 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
         const err = await res.json().catch(() => ({ error: "Request failed" }));
         throw new Error(err.error ?? "Request failed");
       }
-      setMessages((m) => [...m, { id: aid, role: "assistant", content: "" }]);
+      if (!instant) setMessages((m) => [...m, { id: aid, role: "assistant", content: "" }]);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
@@ -381,6 +393,8 @@ export function ThreadView({ threadId, embed }: { threadId: string; embed?: Embe
           if (ev.type === "sources") {
             tierDebug = ev.debug;
             patch((m) => ({ ...m, sources: ev.sources, debug: ev.debug }));
+          } else if (ev.type === "delta" && instant) {
+            chunks++;
           } else if (ev.type === "delta") {
             firstAt ??= performance.now();
             chunks++;

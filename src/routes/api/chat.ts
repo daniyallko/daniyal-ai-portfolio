@@ -8,6 +8,7 @@ const Body = z.object({
   message: z.string().trim().min(1).max(2000),
   lang: z.string().max(5).optional(),
   cachedKey: z.string().max(4000).optional(),
+  firstTurn: z.boolean().optional(),
 });
 
 import { looksOffTopic, type UiAction } from "@/lib/voice-logic";
@@ -46,6 +47,77 @@ export const Route = createFileRoute("/api/chat")({
           ? { ...detectLanguage(message), code: lang, name: LANGUAGES[lang].name }
           : detectLanguage(message);
 
+        const enc = new TextEncoder();
+        const ndjson = { "content-type": "application/x-ndjson", "cache-control": "no-cache" };
+
+        // Greetings skip every database read: reply now, verify the thread and save afterwards.
+        const quick = smallTalkReply(message, detected.code, parsed.data.firstTurn ?? false);
+        if (quick) {
+          const debug = {
+            outcome: "ok" satisfies ChatOutcome,
+            cache: "small_talk",
+            model: "none",
+            language: detected,
+            timingsMs: { firstToken: Date.now() - started, total: Date.now() - started },
+          };
+          const body = [
+            { type: "sources", sources: [], debug },
+            { type: "delta", text: quick },
+            { type: "done", debug, cacheEntry: null, toolCalls: [] },
+          ]
+            .map((o) => JSON.stringify(o) + "\n")
+            .join("");
+          void defer(
+            request,
+            (async () => {
+              const { data: t } = await supabaseAdmin
+                .from("chat_threads")
+                .select("id, title")
+                .eq("id", threadId)
+                .eq("visitor_id", visitorId)
+                .maybeSingle();
+              if (!t) return;
+              await supabaseAdmin
+                .from("chat_messages")
+                .insert({ thread_id: threadId, role: "user", content: message });
+              await supabaseAdmin.from("chat_messages").insert({
+                thread_id: threadId,
+                role: "assistant",
+                content: quick,
+                sources: [] as never,
+                debug: debug as never,
+              });
+              await supabaseAdmin
+                .from("chat_threads")
+                .update({
+                  updated_at: new Date().toISOString(),
+                  ...(t.title === "New chat" ? { title: message.slice(0, 60) } : {}),
+                })
+                .eq("id", threadId);
+              await notifyOwner([
+                `💬 Chat message from visitor ${shortId(visitorId)}`,
+                "",
+                message,
+              ]);
+            })(),
+          );
+          return new Response(
+            new ReadableStream({
+              async start(c) {
+                c.enqueue(enc.encode(body));
+                c.close();
+                await drainDeferred(request);
+              },
+            }),
+            { headers: ndjson },
+          );
+        }
+
+        // Search for the question while the database reads run, instead of after them.
+        const offTopic = looksOffTopic(message);
+        const early = offTopic ? null : retrieve(message, 5, request);
+        early?.catch(() => null);
+
         // Independent reads run concurrently: one network round-trip instead of six.
         const lookupStarted = performance.now();
         const [threadRes, historyRes, earlyCached] = await Promise.all([
@@ -68,7 +140,6 @@ export const Route = createFileRoute("/api/chat")({
         const { data: historyRows, count: historyCount, error: hErr } = historyRes;
         if (hErr) return Response.json({ error: hErr.message }, { status: 500 });
         const history = [...(historyRows ?? [])].reverse();
-        const offTopic = looksOffTopic(message);
         const shareable = canShareAnswer(message, historyCount ?? 0) && !offTopic;
         const cached = shareable ? earlyCached : null;
         const cacheLookupMs = +(performance.now() - lookupStarted).toFixed(2);
@@ -109,7 +180,6 @@ export const Route = createFileRoute("/api/chat")({
         const prevUser = [...history].reverse().find((m) => m.role === "user")?.content;
         const query = followupQuery(message, prevUser);
 
-        const enc = new TextEncoder();
         const stream = new ReadableStream({
           async start(controller) {
             const send = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
@@ -119,9 +189,9 @@ export const Route = createFileRoute("/api/chat")({
             let debug: Record<string, unknown> = {};
             let completed = false;
             try {
-              const quick = smallTalkReply(message, detected.code, history.length === 0);
-              if (quick) {
-                text = quick;
+              const quickLate = smallTalkReply(message, detected.code, history.length === 0);
+              if (quickLate) {
+                text = quickLate;
                 debug = {
                   outcome: "ok" satisfies ChatOutcome,
                   cache: "small_talk",
@@ -172,11 +242,9 @@ export const Route = createFileRoute("/api/chat")({
                       debug: { query, candidates: [], timingsMs: { embed: 0, retrieve: 0 } },
                     };
                   }
-                  if (query === message) return retrieve(message, 5, request);
-                  const [expanded, raw] = await Promise.all([
-                    retrieve(query, 5, request),
-                    retrieve(message, 5, request),
-                  ]);
+                  const rawP = early ?? retrieve(message, 5, request);
+                  if (query === message) return rawP;
+                  const [expanded, raw] = await Promise.all([retrieve(query, 5, request), rawP]);
                   return {
                     ...expanded,
                     sources: mergeSources(expanded.sources, raw.sources, 5),
@@ -286,6 +354,8 @@ export const Route = createFileRoute("/api/chat")({
               console.error(e);
               send({ type: "error", message: msg });
             } finally {
+              // The visitor has the whole answer; finish saving after closing the stream.
+              controller.close();
               if (text.trim()) {
                 await savedUser.catch(() => null); // keep question before answer in history
                 const { error } = await supabaseAdmin.from("chat_messages").insert({
@@ -303,13 +373,10 @@ export const Route = createFileRoute("/api/chat")({
                 .eq("id", threadId);
               await notified;
               await drainDeferred(request);
-              controller.close();
             }
           },
         });
-        return new Response(stream, {
-          headers: { "content-type": "application/x-ndjson", "cache-control": "no-cache" },
-        });
+        return new Response(stream, { headers: ndjson });
       },
     },
   },
