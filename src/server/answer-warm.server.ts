@@ -4,7 +4,7 @@ import { answerKey, canShareAnswer, canonicalQuery, corpusVersion, fingerprint }
 import { detectLanguage, replyLanguageHint } from "@/lib/language";
 import { detectLanguageAndRegister } from "@/lib/multilingualVoiceEngine";
 import { detectActions } from "@/lib/voice-logic";
-import { makeEntry, persistCache, readCache } from "./rag-cache.server";
+import { makeEntry, persistCache, pruneStaleCache, readCache } from "./rag-cache.server";
 import { retrieve } from "./rag.server";
 
 const g = globalThis as { __answerWarm?: Map<string, Promise<WarmReport>> };
@@ -56,6 +56,7 @@ export function warmAnswers(questions: string[], concurrency = 4): Promise<WarmR
       }),
     );
     if (report.failed) running.delete(id);
+    else await pruneStaleCache();
     return report;
   })();
   running.set(id, job);

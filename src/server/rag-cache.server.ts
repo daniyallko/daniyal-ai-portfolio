@@ -129,3 +129,12 @@ export function makeEntry(
     expiresAt: Date.now() + CACHE_TTL,
   };
 }
+
+/** Deletes shared cache rows from retired corpus versions or past expiry. */
+export async function pruneStaleCache(): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("rag_query_cache")
+    .delete()
+    .or(`corpus_version.neq.${corpusVersion()},expires_at.lt.${new Date().toISOString()}`);
+  if (error) console.error("Cache prune failed", error.message);
+}

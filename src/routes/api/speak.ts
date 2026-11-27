@@ -5,8 +5,8 @@ import { VOICE_PERSONAS, getPersona } from "@/config/voicePersonas";
 import { LANGUAGES, detectLanguage, isLangCode } from "@/lib/language";
 
 // Repeated clicks on the same answer shouldn't re-bill the speech model.
-const TTL_MS = 10 * 60 * 1000;
-const MAX_ENTRIES = 12;
+const TTL_MS = 60 * 60 * 1000;
+const MAX_ENTRIES = 80;
 const cache = new Map<string, { audio: ArrayBuffer; at: number }>();
 
 function remember(key: string, audio: ArrayBuffer) {
