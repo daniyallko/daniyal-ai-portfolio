@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 // Public download of the owner's resume (single fixed file uploaded from /admin).
 export const Route = createFileRoute("/api/public/resume")({
+  staticData: { sitemap: false },
   server: {
     handlers: {
       GET: async () => {

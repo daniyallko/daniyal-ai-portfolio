@@ -5,6 +5,7 @@ const Body = z.object({ query: z.string().trim().min(3).max(500) });
 
 // Speculative RAG warm-up from interim voice transcripts. Returns only timing/cache info.
 export const Route = createFileRoute("/api/prefetch")({
+  staticData: { sitemap: false },
   server: {
     handlers: {
       POST: async ({ request }) => {

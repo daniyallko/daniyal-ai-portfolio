@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as EvalRouteImport } from './routes/eval'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiEvalRouteImport } from './routes/api/eval'
@@ -47,6 +48,11 @@ const ChatRoute = ChatRouteImport.update({
 const EvalRoute = EvalRouteImport.update({
   id: '/eval',
   path: '/eval',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/chat': typeof ChatRouteWithChildren
   '/eval': typeof EvalRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/eval': typeof EvalRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/chat': typeof ChatRouteWithChildren
   '/eval': typeof EvalRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/api/chat': typeof ApiChatRoute
   '/api/eval': typeof ApiEvalRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/chat'
     | '/eval'
+    | '/sitemap.xml'
     | '/admin'
     | '/api/chat'
     | '/api/eval'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/eval'
+    | '/sitemap.xml'
     | '/admin'
     | '/api/chat'
     | '/api/eval'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/chat'
     | '/eval'
+    | '/sitemap.xml'
     | '/_authenticated/admin'
     | '/api/chat'
     | '/api/eval'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ChatRoute: typeof ChatRouteWithChildren
   EvalRoute: typeof EvalRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiEvalRoute: typeof ApiEvalRoute
   ApiPrefetchRoute: typeof ApiPrefetchRoute
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       path: '/eval'
       fullPath: '/eval'
       preLoaderRoute: typeof EvalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -354,6 +374,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ChatRoute: ChatRouteWithChildren,
   EvalRoute: EvalRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiChatRoute: ApiChatRoute,
   ApiEvalRoute: ApiEvalRoute,
   ApiPrefetchRoute: ApiPrefetchRoute,

@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import type { EvalResult } from "./api/eval";
 
 export const Route = createFileRoute("/eval")({
+  staticData: { sitemap: false },
   ssr: false,
   head: () => ({
     meta: [

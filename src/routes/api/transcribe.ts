@@ -4,6 +4,7 @@ import { transcribeAudio, GatewayError } from "@lovable.dev/ai-gateway";
 const MAX_BYTES = 10 * 1024 * 1024;
 
 export const Route = createFileRoute("/api/transcribe")({
+  staticData: { sitemap: false },
   server: {
     handlers: {
       POST: async ({ request }) => {

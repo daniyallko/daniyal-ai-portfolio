@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ThreadView } from "@/components/thread-view";
 
 export const Route = createFileRoute("/chat/$threadId")({
+  staticData: { sitemap: false },
   ssr: false,
   head: () => ({
     meta: [

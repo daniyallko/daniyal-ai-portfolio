@@ -22,6 +22,7 @@ function remember(key: string, audio: ArrayBuffer) {
 }
 
 export const Route = createFileRoute("/api/speak")({
+  staticData: { sitemap: false },
   server: {
     handlers: {
       POST: async ({ request }) => {

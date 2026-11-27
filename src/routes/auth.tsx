@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/auth")({
+  staticData: { sitemap: false },
   ssr: false,
   head: () => ({
     meta: [

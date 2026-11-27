@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChatLayout } from "@/components/chat-layout";
 
 export const Route = createFileRoute("/chat")({
+  staticData: { sitemap: "exclude-subtree" },
   ssr: false,
   head: () => ({
     meta: [

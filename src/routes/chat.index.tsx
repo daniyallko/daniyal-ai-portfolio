@@ -5,6 +5,7 @@ import { createThread, listThreads } from "@/lib/chat.functions";
 import { getVisitorId } from "@/lib/visitor";
 
 export const Route = createFileRoute("/chat/")({
+  staticData: { sitemap: false },
   ssr: false,
   head: () => ({
     meta: [

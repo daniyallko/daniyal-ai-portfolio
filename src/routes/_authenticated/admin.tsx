@@ -18,6 +18,7 @@ import { AdminResume } from "@/components/admin-resume";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/_authenticated/admin")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Admin console — visitor sessions" },

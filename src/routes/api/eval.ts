@@ -37,6 +37,7 @@ const p95 = (xs: number[]) => {
 };
 
 export const Route = createFileRoute("/api/eval")({
+  staticData: { sitemap: false },
   server: {
     handlers: {
       POST: async ({ request }) => {

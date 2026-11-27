@@ -8,6 +8,7 @@ import { ProjectFlow } from "@/components/project-flow";
 import { useInlineAssistant } from "@/hooks/use-inline-assistant";
 
 export const Route = createFileRoute("/")({
+  staticData: { sitemap: true },
   head: () => ({
     meta: [
       { title: "Mohd Daniyal — Full Stack AI Engineer | Agentic AI, RAG, Voice AI" },
