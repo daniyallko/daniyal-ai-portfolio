@@ -103,7 +103,15 @@ function isCurated(raw: string): boolean {
   return curated.has(queryWords(raw).sort().join(" "));
 }
 export function canShareAnswer(raw: string, historyLength: number): boolean {
-  if (historyLength !== 0 || SENSITIVE.test(raw)) return false;
+  if (SENSITIVE.test(raw)) return false;
+  // Mid-chat questions may reuse the shared cache only when they clearly stand alone:
+  // long enough that followupQuery() won't fold in the previous turn, and no references back.
+  if (
+    historyLength !== 0 &&
+    (raw.trim().split(/\s+/).length < 8 ||
+      /\b(it|its|he|him|his|she|her|this|these|those|they|them|their|more|also|else|same|again|there)\b/i.test(raw))
+  )
+    return false;
   if (isCurated(raw)) return true;
   if (
     raw.length > 240 ||

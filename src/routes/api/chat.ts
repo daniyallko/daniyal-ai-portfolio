@@ -22,6 +22,15 @@ import { detectLanguage, isLangCode, replyLanguageHint, LANGUAGES } from "@/lib/
 import { detectLanguageAndRegister } from "@/lib/multilingualVoiceEngine";
 import { CHAT_MODEL as MODEL, CHAT_SYSTEM as SYSTEM } from "@/lib/prompt";
 import { MEMORY_FETCH_LIMIT } from "@/lib/chat-memory";
+import { detectActions } from "@/lib/voice-logic";
+import { answerKey, canShareAnswer, canonicalQuery, fingerprint } from "@/lib/rag-cache";
+import { smallTalkReply } from "@/lib/small-talk";
+import { makeEntry, readCache, remember, persistCache, touchCache } from "@/server/rag-cache.server";
+import { defer, drainDeferred } from "@/lib/background.server";
+import { retrieve } from "@/server/rag.server";
+import { prepareChatMemory } from "@/server/chat-memory.server";
+import { notifyOwner, shortId } from "@/lib/telegram.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -30,20 +39,12 @@ export const Route = createFileRoute("/api/chat")({
         const parsed = Body.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return Response.json({ error: "Invalid request" }, { status: 400 });
         const { threadId, visitorId, message, lang } = parsed.data;
-        const { answerKey, canShareAnswer, canonicalQuery, fingerprint } =
-          await import("@/lib/rag-cache");
-        const { makeEntry, readCache, remember, persistCache, touchCache } =
-          await import("@/server/rag-cache.server");
-        const { defer, drainDeferred } = await import("@/lib/background.server");
-        const { detectActions } = await import("@/lib/voice-logic");
         const started = Date.now();
         const version = fingerprint(MODEL + SYSTEM);
         const key = answerKey(message, version, lang);
         const detected = isLangCode(lang)
           ? { ...detectLanguage(message), code: lang, name: LANGUAGES[lang].name }
           : detectLanguage(message);
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { retrieve } = await import("@/server/rag.server");
 
         // Independent reads run concurrently: one network round-trip instead of six.
         const lookupStarted = performance.now();
@@ -81,10 +82,14 @@ export const Route = createFileRoute("/api/chat")({
           });
         }
 
-        const [{ error: insErr }] = await Promise.all([
+        // Saving the question must not delay the answer: it runs while the reply streams.
+        const savedUser = Promise.all([
           supabaseAdmin
             .from("chat_messages")
-            .insert({ thread_id: threadId, role: "user", content: message }),
+            .insert({ thread_id: threadId, role: "user", content: message })
+            .then(({ error }) => {
+              if (error) console.error("chat: user message save failed", error.message);
+            }),
           thread.title === "New chat"
             ? supabaseAdmin
                 .from("chat_threads")
@@ -92,8 +97,7 @@ export const Route = createFileRoute("/api/chat")({
                 .eq("id", threadId)
             : Promise.resolve(null),
         ]);
-        if (insErr) return Response.json({ error: insErr.message }, { status: 500 });
-        const { notifyOwner, shortId } = await import("@/lib/telegram.server");
+        void defer(request, savedUser);
         const notified = notifyOwner([
           `💬 Chat message from visitor ${shortId(visitorId)}`,
           `Thread: ${thread.title === "New chat" ? message.slice(0, 60) : thread.title}`,
@@ -115,7 +119,6 @@ export const Route = createFileRoute("/api/chat")({
             let debug: Record<string, unknown> = {};
             let completed = false;
             try {
-              const { smallTalkReply } = await import("@/lib/small-talk");
               const quick = smallTalkReply(message, detected.code, history.length === 0);
               if (quick) {
                 text = quick;
@@ -161,7 +164,6 @@ export const Route = createFileRoute("/api/chat")({
                 completed = true;
                 return;
               }
-              const { prepareChatMemory } = await import("@/server/chat-memory.server");
               const [r, memory] = await Promise.all([
                 (async (): Promise<Awaited<ReturnType<typeof retrieve>>> => {
                   if (offTopic) {
@@ -285,6 +287,7 @@ export const Route = createFileRoute("/api/chat")({
               send({ type: "error", message: msg });
             } finally {
               if (text.trim()) {
+                await savedUser.catch(() => null); // keep question before answer in history
                 const { error } = await supabaseAdmin.from("chat_messages").insert({
                   thread_id: threadId,
                   role: "assistant",

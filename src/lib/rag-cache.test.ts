@@ -10,7 +10,10 @@ import {
 
 describe("public RAG cache rules", () => {
   it("never publishes contextual answers", () => {
-    expect(canShareAnswer("What RAG systems has Daniyal built in production?", 2)).toBe(false);
+    expect(canShareAnswer("What RAG systems has Daniyal built in production?", 2)).toBe(true);
+    expect(canShareAnswer("Tell me more about it", 2)).toBe(false);
+    expect(canShareAnswer("What tech stack did he use there for this?", 2)).toBe(false);
+    expect(canShareAnswer("Which databases?", 2)).toBe(false);
     expect(canShareAnswer("What RAG systems has Daniyal built in production?", 0)).toBe(true);
   });
   it("does not publish personal inputs", () => {
