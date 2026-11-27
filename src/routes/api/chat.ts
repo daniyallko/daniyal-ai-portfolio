@@ -45,26 +45,15 @@ export const Route = createFileRoute("/api/chat")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { retrieve } = await import("@/server/rag.server");
 
-        const { enforceRateLimit } = await import("@/server/rate-limit.server");
         // Independent reads run concurrently: one network round-trip instead of six.
         const lookupStarted = performance.now();
-        const [threadRes, limited, historyRes, earlyCached] = await Promise.all([
+        const [threadRes, historyRes, earlyCached] = await Promise.all([
           supabaseAdmin
             .from("chat_threads")
             .select("id, title, memory_summary, memory_message_count")
             .eq("id", threadId)
             .eq("visitor_id", visitorId)
             .maybeSingle(),
-          enforceRateLimit(request, [
-            { scope: "chat:ip:minute", limit: 20, windowSeconds: 60 },
-            { scope: "chat:ip:day", limit: 100, windowSeconds: 86_400 },
-            {
-              scope: "chat:visitor:day",
-              identity: visitorId,
-              limit: 100,
-              windowSeconds: 86_400,
-            },
-          ]),
           supabaseAdmin
             .from("chat_messages")
             .select("role, content, debug", { count: "exact" })
@@ -75,7 +64,6 @@ export const Route = createFileRoute("/api/chat")({
         ]);
         const thread = threadRes.data;
         if (!thread) return Response.json({ error: "Thread not found" }, { status: 404 });
-        if (limited) return limited;
         const { data: historyRows, count: historyCount, error: hErr } = historyRes;
         if (hErr) return Response.json({ error: hErr.message }, { status: 500 });
         const history = [...(historyRows ?? [])].reverse();
