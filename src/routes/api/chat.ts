@@ -30,7 +30,7 @@ import { makeEntry, readCache, remember, persistCache, touchCache } from "@/serv
 import { defer, drainDeferred } from "@/lib/background.server";
 import { retrieve } from "@/server/rag.server";
 import { prepareChatMemory } from "@/server/chat-memory.server";
-import { notifyOwner, shortId } from "@/lib/telegram.server";
+import { notifyVisitor } from "@/lib/telegram.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const Route = createFileRoute("/api/chat")({
@@ -95,11 +95,7 @@ export const Route = createFileRoute("/api/chat")({
                   ...(t.title === "New chat" ? { title: message.slice(0, 60) } : {}),
                 })
                 .eq("id", threadId);
-              await notifyOwner([
-                `💬 Chat message from visitor ${shortId(visitorId)}`,
-                "",
-                message,
-              ]);
+              await notifyVisitor(visitorId);
             })(),
           );
           return new Response(
@@ -170,12 +166,8 @@ export const Route = createFileRoute("/api/chat")({
             : Promise.resolve(null),
         ]);
         void defer(request, savedUser);
-        const notified = notifyOwner([
-          `💬 Chat message from visitor ${shortId(visitorId)}`,
-          `Thread: ${thread.title === "New chat" ? message.slice(0, 60) : thread.title}`,
-          "",
-          message,
-        ]);
+        // Read the consolidated transcript only after this question has been saved.
+        const notified = savedUser.then(() => notifyVisitor(visitorId));
 
         // Query reformulation: fold the previous user turn in for short follow-ups.
         const prevUser = [...history].reverse().find((m) => m.role === "user")?.content;

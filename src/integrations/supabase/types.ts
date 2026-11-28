@@ -253,6 +253,36 @@ export type Database = {
         }
         Relationships: []
       }
+      visitor_telegram_messages: {
+        Row: {
+          delivered_revision: number
+          lease_token: string | null
+          lease_until: string | null
+          message_id: number | null
+          revision: number
+          updated_at: string
+          visitor_id: string
+        }
+        Insert: {
+          delivered_revision?: number
+          lease_token?: string | null
+          lease_until?: string | null
+          message_id?: number | null
+          revision?: number
+          updated_at?: string
+          visitor_id: string
+        }
+        Update: {
+          delivered_revision?: number
+          lease_token?: string | null
+          lease_until?: string | null
+          message_id?: number | null
+          revision?: number
+          updated_at?: string
+          visitor_id?: string
+        }
+        Relationships: []
+      }
       visitors: {
         Row: {
           city: string | null
@@ -300,6 +330,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_visitor_telegram: {
+        Args: { _token: string; _visitor_id: string }
+        Returns: {
+          message_id: number
+          revision: number
+        }[]
+      }
       consume_rate_limit: {
         Args: { _key: string; _limit: number; _window_seconds: number }
         Returns: {
@@ -308,12 +345,25 @@ export type Database = {
           retry_after: number
         }[]
       }
+      finish_visitor_telegram: {
+        Args: {
+          _message_id?: number
+          _revision: number
+          _token: string
+          _visitor_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      queue_visitor_telegram: {
+        Args: { _visitor_id: string }
+        Returns: undefined
       }
       touch_rag_cache: { Args: { _key: string }; Returns: undefined }
     }

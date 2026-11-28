@@ -15,7 +15,7 @@ export const trackVisit = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { getRequest } = await import("@tanstack/react-start/server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { notifyOwner, shortId } = await import("@/lib/telegram.server");
+    const { notifyVisitor } = await import("@/lib/telegram.server");
     const h = getRequest()?.headers;
     const ip =
       h?.get("cf-connecting-ip") ?? h?.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
@@ -30,7 +30,7 @@ export const trackVisit = createServerFn({ method: "POST" })
       .maybeSingle();
     const now = new Date();
     if (!existing) {
-      await supabaseAdmin.from("visitors").insert({
+      await supabaseAdmin.from("visitors").upsert({
         id: data.visitorId,
         ip,
         country,
@@ -39,17 +39,8 @@ export const trackVisit = createServerFn({ method: "POST" })
         referrer: data.referrer || null,
         language: data.language ?? null,
         landing_path: data.path,
-      });
-      await notifyOwner([
-        "🆕 New visitor on your portfolio",
-        `ID: ${shortId(data.visitorId)}`,
-        `Page: ${data.path}`,
-        country && `Country: ${country}${city ? ` / ${city}` : ""}`,
-        ip && `IP: ${ip}`,
-        data.language && `Language: ${data.language}`,
-        data.referrer && `From: ${data.referrer}`,
-        ua && `Device: ${ua}`,
-      ]);
+      }, { onConflict: "id", ignoreDuplicates: true }).throwOnError();
+      await notifyVisitor(data.visitorId);
       return { ok: true };
     }
     const gap = now.getTime() - new Date(existing.last_seen).getTime();
@@ -64,14 +55,7 @@ export const trackVisit = createServerFn({ method: "POST" })
         city,
         user_agent: ua,
       })
-      .eq("id", data.visitorId);
-    if (returning)
-      await notifyOwner([
-        `🔁 Returning visitor (visit #${existing.visits + 1})`,
-        `ID: ${shortId(data.visitorId)}`,
-        `Page: ${data.path}`,
-        country && `Country: ${country}`,
-        ip && `IP: ${ip}`,
-      ]);
+      .eq("id", data.visitorId).throwOnError();
+    await notifyVisitor(data.visitorId);
     return { ok: true };
   });

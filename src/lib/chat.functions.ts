@@ -119,12 +119,8 @@ export const appendVoiceTurns = createServerFn({ method: "POST" })
       .eq("id", t.id);
     const userTurns = data.turns.filter((m) => m.role === "user");
     if (userTurns.length) {
-      const { notifyOwner, shortId } = await import("@/lib/telegram.server");
-      await notifyOwner([
-        `🎙️ Voice call from visitor ${shortId(data.visitorId)} (${userTurns.length} question${userTurns.length > 1 ? "s" : ""})`,
-        "",
-        ...userTurns.map((m) => `• ${m.content}`),
-      ]);
+      const { notifyVisitor } = await import("@/lib/telegram.server");
+      await notifyVisitor(data.visitorId);
     }
     return { ok: true };
   });
